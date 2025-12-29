@@ -1,0 +1,53 @@
+{% extends "components/base.html" %}
+
+{% block content %}
+<div class="hero-section text-center py-5 bg-light">
+    <h1 class="display-4">Welcome to Adiseware</h1>
+    <p class="lead">Empowering Agriculture Through Technology</p>
+    <div class="mt-4">
+        <a href="{{ url_for('register') }}" class="btn btn-success btn-lg me-2" aria-label="Get started by registering">Get Started</a>
+        <a href="{{ url_for('login') }}" class="btn btn-outline-success btn-lg" aria-label="Login to your account">Login</a>
+    </div>
+</div>
+
+<div class="container my-5">
+    <div class="row">
+        <div class="col-md-3 text-center mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <i class="fas fa-user-tie fa-3x text-success mb-3" aria-hidden="true"></i>
+                    <h3 class="h5 card-title">Farmers</h3>
+                    <p class="card-text">Detect plant diseases, get weather recommendations, and find nearby agrovets.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 text-center mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <i class="fas fa-store fa-3x text-success mb-3" aria-hidden="true"></i>
+                    <h3 class="h5 card-title">Agrovets</h3>
+                    <p class="card-text">Manage inventory, run POS system, and maintain customer relationships.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 text-center mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <i class="fas fa-user-shield fa-3x text-success mb-3" aria-hidden="true"></i>
+                    <h3 class="h5 card-title">Extension Officers</h3>
+                    <p class="card-text">Monitor disease outbreaks and provide advisory services to farmers.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 text-center mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <i class="fas fa-graduation-cap fa-3x text-success mb-3" aria-hidden="true"></i>
+                    <h3 class="h5 card-title">Learning Institutions</h3>
+                    <p class="card-text">Access educational resources and agricultural research data.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

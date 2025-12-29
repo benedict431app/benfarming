@@ -1,0 +1,60 @@
+{% extends "components/base.html" %}
+
+{% block title %}Find Agrovets - Adiseware{% endblock %}
+
+{% block content %}
+<h1 class="mb-4"><i class="fas fa-store" aria-hidden="true"></i> Find Agricultural Suppliers</h1>
+
+<div class="row">
+    {% if agrovets %}
+        {% for agrovet in agrovets %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        {% if agrovet.profile_picture %}
+                        <img src="{{ url_for('static', filename='uploads/' + agrovet.profile_picture) }}" 
+                             alt="{{ agrovet.full_name }}'s profile picture" class="rounded-circle me-3" 
+                             style="width: 60px; height: 60px; object-fit: cover;">
+                        {% else %}
+                        <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center me-3" 
+                             style="width: 60px; height: 60px;">
+                            <i class="fas fa-store fa-2x" aria-hidden="true"></i>
+                        </div>
+                        {% endif %}
+                        <div>
+                            <h2 class="h5 mb-0">{{ agrovet.full_name }}</h2>
+                            <p class="text-muted mb-0 small">Agrovet</p>
+                        </div>
+                    </div>
+                    
+                    {% if agrovet.location %}
+                    <p class="mb-2"><i class="fas fa-map-marker-alt text-danger" aria-hidden="true"></i> {{ agrovet.location }}</p>
+                    {% endif %}
+                    
+                    {% if agrovet.phone_number %}
+                    <p class="mb-2"><i class="fas fa-phone text-primary" aria-hidden="true"></i> <a href="tel:{{ agrovet.phone_number }}">{{ agrovet.phone_number }}</a></p>
+                    {% endif %}
+                    
+                    {% if agrovet.email %}
+                    <p class="mb-3"><i class="fas fa-envelope text-info" aria-hidden="true"></i> <a href="mailto:{{ agrovet.email }}">{{ agrovet.email }}</a></p>
+                    {% endif %}
+                    
+                    <div class="d-grid">
+                        <a href="#" class="btn btn-success btn-sm">
+                            <i class="fas fa-shopping-cart" aria-hidden="true"></i> View Products
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+    <div class="col-12">
+        <div class="alert alert-info" role="alert">
+            No agrovets found in your area yet.
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

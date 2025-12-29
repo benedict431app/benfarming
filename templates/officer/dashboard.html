@@ -1,0 +1,76 @@
+{% extends "components/base.html" %}
+
+{% block title %}Extension Officer Dashboard - Adiseware{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Extension Officer Dashboard</h1>
+
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card h-100 border-primary">
+            <div class="card-body">
+                <h2 class="h6 text-muted">Total Disease Reports</h2>
+                <p class="display-5">{{ disease_reports|length }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card h-100 border-success">
+            <div class="card-body">
+                <h2 class="h6 text-muted">Registered Farmers</h2>
+                <p class="display-5">{{ farmers|length }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card stat-card h-100 border-warning">
+            <div class="card-body">
+                <h2 class="h6 text-muted">Pending Reports</h2>
+                <p class="display-5">{{ disease_reports|selectattr('status', 'equalto', 'pending')|list|length }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="h5 mb-0">Disease Outbreak Reports</h2>
+    </div>
+    <div class="card-body">
+        {% if disease_reports %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Farmer</th>
+                        <th>Location</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for report in disease_reports %}
+                    <tr>
+                        <td>{{ report.created_at|datetime }}</td>
+                        <td>{{ report.farmer.full_name }}</td>
+                        <td>{{ report.location or 'N/A' }}</td>
+                        <td>{{ report.plant_description[:50] }}...</td>
+                        <td><span class="badge bg-{{ 'warning' if report.status == 'pending' else 'success' }}">{{ report.status }}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#reportModal{{ report.id }}">
+                                <i class="fas fa-eye" aria-hidden="true"></i> View
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted">No disease reports yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

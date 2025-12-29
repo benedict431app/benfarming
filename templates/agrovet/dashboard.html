@@ -1,0 +1,87 @@
+{% extends "components/base.html" %}
+
+{% block title %}Agrovet Dashboard - Adiseware{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Agrovet Dashboard</h1>
+
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card h-100 border-primary">
+            <div class="card-body">
+                <h2 class="h6 text-muted">Total Products</h2>
+                <p class="display-5">{{ total_products }}</p>
+                <a href="{{ url_for('agrovet_inventory') }}" class="btn btn-sm btn-primary">Manage</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card h-100 border-danger">
+            <div class="card-body">
+                <h2 class="h6 text-muted">Low Stock Items</h2>
+                <p class="display-5 text-danger">{{ low_stock_items }}</p>
+                <a href="{{ url_for('agrovet_inventory') }}" class="btn btn-sm btn-danger">View</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card h-100 border-success">
+            <div class="card-body">
+                <h2 class="h6 text-muted">Total Customers</h2>
+                <p class="display-5">{{ total_customers }}</p>
+                <a href="{{ url_for('agrovet_crm') }}" class="btn btn-sm btn-success">View CRM</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stat-card h-100 border-warning">
+            <div class="card-body">
+                <h2 class="h6 text-muted">Today's Revenue</h2>
+                <p class="display-6">KSh {{ "%.2f"|format(today_revenue) }}</p>
+                <a href="{{ url_for('agrovet_pos') }}" class="btn btn-sm btn-warning">POS</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Recent Sales</h2>
+                <a href="{{ url_for('agrovet_pos') }}" class="btn btn-sm btn-primary">New Sale</a>
+            </div>
+            <div class="card-body">
+                {% if recent_sales %}
+                <div class="table-responsive">
+                    <table class="table table-striped" role="table" aria-label="Recent sales">
+                        <thead>
+                            <tr>
+                                <th scope="col">Receipt #</th>
+                                <th scope="col">Date</th>
+                                <th scope="col">Customer</th>
+                                <th scope="col">Amount</th>
+                                <th scope="col">Payment Method</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sale in recent_sales %}
+                            <tr>
+                                <td>{{ sale.receipt_number }}</td>
+                                <td>{{ sale.sale_date|datetime }}</td>
+                                <td>{{ sale.customer.name if sale.customer else 'Walk-in Customer' }}</td>
+                                <td>KSh {{ "%.2f"|format(sale.total_amount) }}</td>
+                                <td><span class="badge bg-info">{{ sale.payment_method|capitalize }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">No sales yet. <a href="{{ url_for('agrovet_pos') }}">Start selling</a></p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

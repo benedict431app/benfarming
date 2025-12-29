@@ -1,0 +1,94 @@
+{% extends "components/base.html" %}
+
+{% block title %}Weather & Recommendations - Adiseware{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Weather & Farming Recommendations</h1>
+
+<div class="row">
+    <div class="col-md-8">
+        {% if weather %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h2 class="h5 mb-0"><i class="fas fa-cloud-sun" aria-hidden="true"></i> Current Weather in {{ weather.name }}</h2>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h3 class="display-4">{{ weather.main.temp }}°C</h3>
+                        <p class="lead">{{ weather.weather[0].description|capitalize }}</p>
+                        <p><strong>Feels like:</strong> {{ weather.main.feels_like }}°C</p>
+                        <p><strong>Humidity:</strong> {{ weather.main.humidity }}%</p>
+                        <p><strong>Wind Speed:</strong> {{ weather.wind.speed }} m/s</p>
+                    </div>
+                    <div class="col-md-6">
+                        <img src="http://openweathermap.org/img/wn/{{ weather.weather[0].icon }}@4x.png" 
+                             alt="Weather icon for {{ weather.weather[0].description }}" class="img-fluid">
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mt-3" role="alert">
+                    <h3 class="h6 alert-heading"><i class="fas fa-lightbulb" aria-hidden="true"></i> Farming Recommendations</h3>
+                    {% if weather.main.temp > 30 %}
+                    <p>High temperatures detected. Ensure adequate irrigation for your crops.</p>
+                    {% elif weather.main.temp < 10 %}
+                    <p>Low temperatures. Protect sensitive crops from cold stress.</p>
+                    {% endif %}
+                    
+                    {% if weather.main.humidity > 70 %}
+                    <p>High humidity may increase risk of fungal diseases. Monitor plants closely.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        {% if forecast %}
+        <div class="card">
+            <div class="card-header">
+                <h2 class="h5 mb-0"><i class="fas fa-calendar-alt" aria-hidden="true"></i> 5-Day Forecast</h2>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for item in forecast.list[:5] %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <p class="mb-1"><strong>{{ item.dt_txt }}</strong></p>
+                                <img src="http://openweathermap.org/img/wn/{{ item.weather[0].icon }}@2x.png" 
+                                     alt="{{ item.weather[0].description }}" class="img-fluid">
+                                <p class="mb-0">{{ item.main.temp }}°C</p>
+                                <p class="small text-muted">{{ item.weather[0].description|capitalize }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="alert alert-warning" role="alert">
+            Unable to load weather data. Please try again later.
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="h6 mb-0">Change Location</h2>
+            </div>
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('farmer_weather') }}">
+                    <div class="mb-3">
+                        <label for="location" class="form-label">City Name</label>
+                        <input type="text" class="form-control" id="location" name="location" 
+                               placeholder="Enter city name" value="{{ request.args.get('location', '') }}">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Get Weather</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

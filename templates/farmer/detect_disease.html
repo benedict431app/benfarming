@@ -1,0 +1,103 @@
+{% extends "components/base.html" %}
+
+{% block title %}Plant Disease Detection - Adiseware{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h1 class="h4 mb-0"><i class="fas fa-microscope" aria-hidden="true"></i> Plant Disease Detection</h1>
+            </div>
+            <div class="card-body">
+                <form id="diseaseForm" enctype="multipart/form-data" novalidate>
+                    <div class="mb-3">
+                        <label for="plant_image" class="form-label">Upload Plant Image <span class="text-danger" aria-label="required">*</span></label>
+                        <input type="file" class="form-control" id="plant_image" name="plant_image" accept="image/*" required 
+                               aria-required="true" aria-describedby="imageHelp">
+                        <div id="imageHelp" class="form-text">Upload a clear photo of the affected plant</div>
+                        <div id="imagePreview" class="mt-2"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Additional Description (Optional)</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" 
+                                  aria-describedby="descHelp" placeholder="Describe any symptoms or concerns..."></textarea>
+                        <div id="descHelp" class="form-text">Provide any additional context about the plant's condition</div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg" id="analyzeButton">
+                            <i class="fas fa-search" aria-hidden="true"></i> Analyze Plant
+                        </button>
+                    </div>
+                </form>
+                
+                <div id="loadingIndicator" class="text-center mt-4" style="display: none;" role="status" aria-live="polite">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Analyzing plant image...</span>
+                    </div>
+                    <p class="mt-2">Analyzing your plant image... This may take a moment.</p>
+                </div>
+                
+                <div id="resultsContainer" class="mt-4" style="display: none;">
+                    <div class="alert alert-success" role="alert">
+                        <h2 class="h5 alert-heading"><i class="fas fa-check-circle" aria-hidden="true"></i> Analysis Complete</h2>
+                        <div id="analysisResults"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('plant_image').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('imagePreview').innerHTML = 
+                `<img src="${e.target.result}" alt="Preview of plant image" class="img-fluid" style="max-height: 300px;">`;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+document.getElementById('diseaseForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const resultsContainer = document.getElementById('resultsContainer');
+    const analyzeButton = document.getElementById('analyzeButton');
+    
+    loadingIndicator.style.display = 'block';
+    resultsContainer.style.display = 'none';
+    analyzeButton.disabled = true;
+    
+    fetch('/farmer/detect-disease', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        loadingIndicator.style.display = 'none';
+        analyzeButton.disabled = false;
+        
+        if (data.success) {
+            document.getElementById('analysisResults').innerHTML = data.analysis;
+            resultsContainer.style.display = 'block';
+            resultsContainer.focus();
+        } else {
+            alert('Error: ' + (data.error || 'Analysis failed'));
+        }
+    })
+    .catch(error => {
+        loadingIndicator.style.display = 'none';
+        analyzeButton.disabled = false;
+        alert('Error analyzing image. Please try again.');
+    });
+});
+</script>
+{% endblock %}

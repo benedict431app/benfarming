@@ -1,0 +1,201 @@
+{% extends "components/base.html" %}
+
+{% block title %}Point of Sale - Adiseware{% endblock %}
+
+{% block content %}
+<h1 class="mb-4"><i class="fas fa-cash-register" aria-hidden="true"></i> Point of Sale</h1>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Products</h2>
+            </div>
+            <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                <div class="row">
+                    {% for item in items %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card product-card" onclick="addToCart({{ item.id }}, '{{ item.product_name }}', {{ item.price }}, {{ item.quantity }})" 
+                             style="cursor: pointer;" tabindex="0" role="button" aria-label="Add {{ item.product_name }} to cart">
+                            <div class="card-body text-center">
+                                <h3 class="h6">{{ item.product_name }}</h3>
+                                <p class="mb-1"><strong>KSh {{ "%.2f"|format(item.price) }}</strong></p>
+                                <p class="small text-muted">Stock: {{ item.quantity }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card sticky-top" style="top: 20px;">
+            <div class="card-header bg-success text-white">
+                <h2 class="h5 mb-0">Cart</h2>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="customer_select" class="form-label">Customer (Optional)</label>
+                    <select class="form-select" id="customer_select">
+                        <option value="">Walk-in Customer</option>
+                        {% for customer in customers %}
+                        <option value="{{ customer.id }}">{{ customer.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div id="cartItems" style="max-height: 300px; overflow-y: auto;">
+                    <p class="text-muted text-center">Cart is empty</p>
+                </div>
+                
+                <hr>
+                
+                <div class="d-flex justify-content-between mb-3">
+                    <strong>Total:</strong>
+                    <strong id="cartTotal">KSh 0.00</strong>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="payment_method" class="form-label">Payment Method</label>
+                    <select class="form-select" id="payment_method">
+                        <option value="cash">Cash</option>
+                        <option value="mpesa">M-Pesa</option>
+                        <option value="card">Card</option>
+                    </select>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-lg" id="checkoutBtn" onclick="checkout()" disabled>
+                        <i class="fas fa-check" aria-hidden="true"></i> Checkout
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="clearCart()">
+                        <i class="fas fa-trash" aria-hidden="true"></i> Clear Cart
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let cart = [];
+
+function addToCart(id, name, price, stock) {
+    const existingItem = cart.find(item => item.id === id);
+    
+    if (existingItem) {
+        if (existingItem.quantity < stock) {
+            existingItem.quantity++;
+        } else {
+            alert('Insufficient stock');
+            return;
+        }
+    } else {
+        cart.push({ id, name, price, quantity: 1, stock });
+    }
+    
+    updateCart();
+}
+
+function removeFromCart(id) {
+    cart = cart.filter(item => item.id !== id);
+    updateCart();
+}
+
+function updateQuantity(id, change) {
+    const item = cart.find(item => item.id === id);
+    if (item) {
+        const newQuantity = item.quantity + change;
+        if (newQuantity > 0 && newQuantity <= item.stock) {
+            item.quantity = newQuantity;
+            updateCart();
+        }
+    }
+}
+
+function updateCart() {
+    const cartItems = document.getElementById('cartItems');
+    const cartTotal = document.getElementById('cartTotal');
+    const checkoutBtn = document.getElementById('checkoutBtn');
+    
+    if (cart.length === 0) {
+        cartItems.innerHTML = '<p class="text-muted text-center">Cart is empty</p>';
+        cartTotal.textContent = 'KSh 0.00';
+        checkoutBtn.disabled = true;
+        return;
+    }
+    
+    let total = 0;
+    let html = '';
+    
+    cart.forEach(item => {
+        const subtotal = item.price * item.quantity;
+        total += subtotal;
+        
+        html += `
+            <div class="pos-cart-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${item.name}</strong><br>
+                        <small>KSh ${item.price.toFixed(2)} × ${item.quantity}</small>
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" onclick="updateQuantity(${item.id}, -1)">-</button>
+                        <button class="btn btn-outline-secondary" onclick="updateQuantity(${item.id}, 1)">+</button>
+                        <button class="btn btn-outline-danger" onclick="removeFromCart(${item.id})">×</button>
+                    </div>
+                </div>
+                <div class="text-end mt-1">
+                    <strong>KSh ${subtotal.toFixed(2)}</strong>
+                </div>
+            </div>
+        `;
+    });
+    
+    cartItems.innerHTML = html;
+    cartTotal.textContent = `KSh ${total.toFixed(2)}`;
+    checkoutBtn.disabled = false;
+}
+
+function clearCart() {
+    if (confirm('Clear all items from cart?')) {
+        cart = [];
+        updateCart();
+    }
+}
+
+function checkout() {
+    if (cart.length === 0) return;
+    
+    const customerId = document.getElementById('customer_select').value || null;
+    const paymentMethod = document.getElementById('payment_method').value;
+    
+    fetch('/agrovet/pos/checkout', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            items: cart,
+            customer_id: customerId,
+            payment_method: paymentMethod
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Sale completed!\\nReceipt: ${data.receipt_number}\\nTotal: KSh ${data.total_amount.toFixed(2)}`);
+            cart = [];
+            updateCart();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('Error processing sale');
+    });
+}
+</script>
+{% endblock %}

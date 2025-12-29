@@ -1,0 +1,86 @@
+{% extends "components/base.html" %}
+
+{% block title %}Edit Product - Adiseware{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h1 class="h4 mb-0">Edit Product: {{ item.product_name }}</h1>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('edit_inventory', item_id=item.id) }}">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="product_name" class="form-label">Product Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="product_name" name="product_name" value="{{ item.product_name }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="category" class="form-label">Category</label>
+                            <select class="form-select" id="category" name="category">
+                                <option value="">Select category...</option>
+                                <option value="Seeds" {% if item.category == 'Seeds' %}selected{% endif %}>Seeds</option>
+                                <option value="Fertilizers" {% if item.category == 'Fertilizers' %}selected{% endif %}>Fertilizers</option>
+                                <option value="Pesticides" {% if item.category == 'Pesticides' %}selected{% endif %}>Pesticides</option>
+                                <option value="Tools" {% if item.category == 'Tools' %}selected{% endif %}>Tools</option>
+                                <option value="Equipment" {% if item.category == 'Equipment' %}selected{% endif %}>Equipment</option>
+                                <option value="Other" {% if item.category == 'Other' %}selected{% endif %}>Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3">{{ item.description }}</textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="quantity" class="form-label">Quantity <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="quantity" name="quantity" value="{{ item.quantity }}" required min="0">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="unit" class="form-label">Unit</label>
+                            <input type="text" class="form-control" id="unit" name="unit" value="{{ item.unit }}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="reorder_level" class="form-label">Reorder Level</label>
+                            <input type="number" class="form-control" id="reorder_level" name="reorder_level" value="{{ item.reorder_level }}" min="0">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="cost_price" class="form-label">Cost Price (KSh)</label>
+                            <input type="number" step="0.01" class="form-control" id="cost_price" name="cost_price" value="{{ item.cost_price }}" min="0">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="price" class="form-label">Selling Price (KSh) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" class="form-control" id="price" name="price" value="{{ item.price }}" required min="0">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="supplier" class="form-label">Supplier</label>
+                            <input type="text" class="form-control" id="supplier" name="supplier" value="{{ item.supplier }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="sku" class="form-label">SKU/Product Code</label>
+                            <input type="text" class="form-control" id="sku" name="sku" value="{{ item.sku }}">
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save" aria-hidden="true"></i> Update Product
+                        </button>
+                        <a href="{{ url_for('agrovet_inventory') }}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

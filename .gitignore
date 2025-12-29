@@ -1,0 +1,22 @@
+# Python cache 
+__pycache__/ 
+*.py[cod] 
+ 
+# Environment 
+.env 
+.env.local 
+.env.production 
+ 
+# Database 
+*.db 
+*.sqlite 
+*.sqlite3 
+database.db 
+ 
+# Uploads 
+uploads/ 
+static/uploads/ 
+ 
+# OS files 
+.DS_Store 
+Thumbs.db 

@@ -1,0 +1,40 @@
+{% extends "components/base.html" %}
+
+{% block title %}Learning Institution Dashboard - Adiseware{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Learning Institution Dashboard</h1>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-book fa-3x text-primary mb-3" aria-hidden="true"></i>
+                <h2 class="h5">Educational Resources</h2>
+                <p>Access agricultural research papers, guides, and training materials.</p>
+                <button class="btn btn-primary">View Resources</button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-chart-line fa-3x text-success mb-3" aria-hidden="true"></i>
+                <h2 class="h5">Research Data</h2>
+                <p>Analyze agricultural trends and patterns in your region.</p>
+                <button class="btn btn-success">View Analytics</button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-users fa-3x text-warning mb-3" aria-hidden="true"></i>
+                <h2 class="h5">Student Programs</h2>
+                <p>Manage student research projects and field programs.</p>
+                <button class="btn btn-warning">Manage Programs</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

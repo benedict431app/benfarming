@@ -1,0 +1,130 @@
+<header role="banner">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-success" role="navigation" aria-label="Main navigation">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('index') }}" aria-label="Adiseware home">
+                <i class="fas fa-seedling" aria-hidden="true"></i> Adiseware
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    {% if current_user.is_authenticated %}
+                        {% if current_user.user_type == 'farmer' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('farmer_dashboard') }}" aria-label="Go to dashboard">
+                                <i class="fas fa-tachometer-alt" aria-hidden="true"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('detect_disease') }}" aria-label="Detect plant disease">
+                                <i class="fas fa-camera" aria-hidden="true"></i> Disease Detection
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('farmer_weather') }}" aria-label="View weather">
+                                <i class="fas fa-cloud-sun" aria-hidden="true"></i> Weather
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('farmer_agrovets') }}" aria-label="Find agrovets">
+                                <i class="fas fa-store" aria-hidden="true"></i> Find Agrovets
+                            </a>
+                        </li>
+                        {% elif current_user.user_type == 'agrovet' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('agrovet_dashboard') }}" aria-label="Go to dashboard">
+                                <i class="fas fa-tachometer-alt" aria-hidden="true"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('agrovet_inventory') }}" aria-label="Manage inventory">
+                                <i class="fas fa-boxes" aria-hidden="true"></i> Inventory
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('agrovet_pos') }}" aria-label="Point of sale">
+                                <i class="fas fa-cash-register" aria-hidden="true"></i> POS
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('agrovet_crm') }}" aria-label="Customer relationship management">
+                                <i class="fas fa-users" aria-hidden="true"></i> CRM
+                            </a>
+                        </li>
+                        {% elif current_user.user_type == 'extension_officer' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('officer_dashboard') }}" aria-label="Go to dashboard">
+                                <i class="fas fa-tachometer-alt" aria-hidden="true"></i> Dashboard
+                            </a>
+                        </li>
+                        {% elif current_user.user_type == 'learning_institution' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('institution_dashboard') }}" aria-label="Go to dashboard">
+                                <i class="fas fa-tachometer-alt" aria-hidden="true"></i> Dashboard
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle position-relative" href="#" id="notificationsDropdown" role="button" 
+                               data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
+                                <i class="fas fa-bell" aria-hidden="true"></i>
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
+                                      aria-label="Unread notifications count">
+                                    {{ current_user.notifications|selectattr('is_read', 'equalto', False)|list|length }}
+                                </span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationsDropdown">
+                                {% set unread_notifications = current_user.notifications|selectattr('is_read', 'equalto', False)|list %}
+                                {% if unread_notifications %}
+                                    {% for notification in unread_notifications[:5] %}
+                                    <li>
+                                        <a class="dropdown-item" href="{{ notification.link or '#' }}">
+                                            <strong>{{ notification.title }}</strong><br>
+                                            <small>{{ notification.message[:50] }}...</small>
+                                        </a>
+                                    </li>
+                                    {% endfor %}
+                                {% else %}
+                                    <li><span class="dropdown-item">No new notifications</span></li>
+                                {% endif %}
+                            </ul>
+                        </li>
+                        
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" 
+                               data-bs-toggle="dropdown" aria-expanded="false" aria-label="User menu">
+                                {% if current_user.profile_picture %}
+                                <img src="{{ url_for('static', filename='uploads/' + current_user.profile_picture) }}" 
+                                     alt="{{ current_user.full_name }}'s profile picture" class="rounded-circle" style="width: 30px; height: 30px;">
+                                {% else %}
+                                <i class="fas fa-user-circle" aria-hidden="true"></i>
+                                {% endif %}
+                                {{ current_user.full_name }}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                <li><a class="dropdown-item" href="#"><i class="fas fa-user" aria-hidden="true"></i> Profile</a></li>
+                                <li><a class="dropdown-item" href="#"><i class="fas fa-cog" aria-hidden="true"></i> Settings</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt" aria-hidden="true"></i> Logout</a></li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('login') }}" aria-label="Login to your account">
+                                <i class="fas fa-sign-in-alt" aria-hidden="true"></i> Login
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('register') }}" aria-label="Register new account">
+                                <i class="fas fa-user-plus" aria-hidden="true"></i> Register
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+</header>
