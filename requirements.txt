@@ -3,4 +3,4 @@ Flask-Login==0.6.2
 Flask-SQLAlchemy==3.0.2
 psycopg2-binary==2.9.6
 python-dotenv==0.21.0
-Pillow==10.4.0  # Updated from 9.4.0 to 10.4.0
+Pillow==10.4.0
