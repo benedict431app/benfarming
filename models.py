@@ -6,26 +6,6 @@ import uuid
 
 db = SQLAlchemy()
 
-# Association tables
-cart_items = db.Table('cart_items',
-    db.Column('id', db.Integer, primary_key=True),
-    db.Column('cart_id', db.Integer, db.ForeignKey('carts.id')),
-    db.Column('product_id', db.Integer, db.ForeignKey('inventory_items.id')),
-    db.Column('quantity', db.Integer, default=1),
-    db.Column('added_at', db.Column(db.DateTime, default=datetime.utcnow)),
-    db.UniqueConstraint('cart_id', 'product_id', name='unique_cart_product')
-)
-
-order_items = db.Table('order_items',
-    db.Column('id', db.Integer, primary_key=True),
-    db.Column('order_id', db.Integer, db.ForeignKey('orders.id')),
-    db.Column('product_id', db.Integer, db.ForeignKey('inventory_items.id')),
-    db.Column('quantity', db.Integer, nullable=False),
-    db.Column('unit_price', db.Float, nullable=False),
-    db.Column('subtotal', db.Float, nullable=False),
-    db.UniqueConstraint('order_id', 'product_id', name='unique_order_product')
-)
-
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     
@@ -56,10 +36,6 @@ class User(UserMixin, db.Model):
     
     # Relationships - explicitly specify foreign_keys
     inventory_items = db.relationship('InventoryItem', backref='agrovet', lazy=True, cascade='all, delete-orphan')
-    sales = db.relationship('Sale', backref='agrovet', lazy=True, cascade='all, delete-orphan')
-    customers = db.relationship('Customer', backref='agrovet', lazy=True, cascade='all, delete-orphan')
-    disease_reports = db.relationship('DiseaseReport', backref='farmer', lazy=True, cascade='all, delete-orphan')
-    notifications = db.relationship('Notification', backref='user', lazy=True, cascade='all, delete-orphan')
     
     # E-commerce relationships
     cart = db.relationship('Cart', backref='user', uselist=False, cascade='all, delete-orphan')
@@ -90,15 +66,18 @@ class User(UserMixin, db.Model):
     
     @property
     def unread_notifications(self):
+        from models import Notification
         return Notification.query.filter_by(user_id=self.id, is_read=False).count()
     
     @property
     def unread_messages(self):
+        from models import Message
         return Message.query.filter_by(receiver_id=self.id, is_read=False).count()
     
     @property
     def community_stats(self):
         from sqlalchemy import func
+        from models import CommunityPost, PostAnswer
         posts_count = CommunityPost.query.filter_by(user_id=self.id).count()
         answers_count = PostAnswer.query.filter_by(user_id=self.id).count()
         accepted_answers = PostAnswer.query.filter_by(user_id=self.id, is_accepted=True).count()
@@ -111,6 +90,7 @@ class User(UserMixin, db.Model):
     
     @property
     def order_stats(self):
+        from models import Order
         total_orders = Order.query.filter_by(user_id=self.id).count()
         pending_orders = Order.query.filter_by(user_id=self.id, status='pending').count()
         completed_orders = Order.query.filter_by(user_id=self.id, status='completed').count()
@@ -120,28 +100,6 @@ class User(UserMixin, db.Model):
             'pending': pending_orders,
             'completed': completed_orders
         }
-    
-    def get_distance(self, lat2, lon2):
-        """Calculate distance between two coordinates in km"""
-        if not all([self.latitude, self.longitude, lat2, lon2]):
-            return None
-        
-        from math import radians, sin, cos, sqrt, atan2
-        
-        R = 6371  # Earth's radius in km
-        
-        lat1_rad = radians(self.latitude)
-        lon1_rad = radians(self.longitude)
-        lat2_rad = radians(lat2)
-        lon2_rad = radians(lon2)
-        
-        dlon = lon2_rad - lon1_rad
-        dlat = lat2_rad - lat1_rad
-        
-        a = sin(dlat/2)**2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlon/2)**2
-        c = 2 * atan2(sqrt(a), sqrt(1-a))
-        
-        return R * c
 
 class InventoryItem(db.Model):
     __tablename__ = 'inventory_items'
@@ -172,6 +130,8 @@ class InventoryItem(db.Model):
     
     # Relationships
     reviews = db.relationship('ProductReview', backref='product', lazy=True, cascade='all, delete-orphan')
+    cart_items = db.relationship('CartItem', backref='product', lazy=True, cascade='all, delete-orphan')
+    order_items = db.relationship('OrderItem', backref='product', lazy=True, cascade='all, delete-orphan')
     
     def is_low_stock(self):
         return self.quantity <= self.reorder_level
@@ -193,106 +153,6 @@ class InventoryItem(db.Model):
         else:
             return 'in_stock'
 
-class Customer(db.Model):
-    __tablename__ = 'customers'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    agrovet_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(120))
-    phone = db.Column(db.String(20))
-    address = db.Column(db.String(255))
-    customer_type = db.Column(db.String(50))
-    notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    total_purchases = db.Column(db.Float, default=0.0)
-    last_purchase = db.Column(db.DateTime)
-    
-    purchases = db.relationship('Sale', backref='customer', lazy=True)
-    communications = db.relationship('Communication', backref='customer', lazy=True, cascade='all, delete-orphan')
-
-class Sale(db.Model):
-    __tablename__ = 'sales'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    agrovet_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
-    sale_date = db.Column(db.DateTime, default=datetime.utcnow)
-    total_amount = db.Column(db.Float, nullable=False)
-    payment_method = db.Column(db.String(50))
-    status = db.Column(db.String(50), default='completed')
-    receipt_number = db.Column(db.String(100), unique=True)
-    notes = db.Column(db.Text)
-    
-    items = db.relationship('SaleItem', backref='sale', lazy=True, cascade='all, delete-orphan')
-
-class SaleItem(db.Model):
-    __tablename__ = 'sale_items'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=False)
-    product_name = db.Column(db.String(200), nullable=False)
-    quantity = db.Column(db.Integer, nullable=False)
-    unit_price = db.Column(db.Float, nullable=False)
-    subtotal = db.Column(db.Float, nullable=False)
-
-class Communication(db.Model):
-    __tablename__ = 'communications'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
-    communication_type = db.Column(db.String(50))
-    subject = db.Column(db.String(200))
-    message = db.Column(db.Text)
-    date = db.Column(db.DateTime, default=datetime.utcnow)
-    follow_up_date = db.Column(db.DateTime)
-    status = db.Column(db.String(50), default='pending')
-
-class DiseaseReport(db.Model):
-    __tablename__ = 'disease_reports'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    farmer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    plant_image = db.Column(db.String(255))
-    plant_description = db.Column(db.Text)
-    disease_detected = db.Column(db.String(200))
-    confidence = db.Column(db.Float)
-    treatment_recommendation = db.Column(db.Text)
-    location = db.Column(db.String(200))
-    latitude = db.Column(db.Float)
-    longitude = db.Column(db.Float)
-    status = db.Column(db.String(50), default='pending')
-    severity = db.Column(db.String(50))  # low, medium, high
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-class Notification(db.Model):
-    __tablename__ = 'notifications'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    title = db.Column(db.String(200), nullable=False)
-    message = db.Column(db.Text, nullable=False)
-    notification_type = db.Column(db.String(50))  # info, success, warning, danger
-    is_read = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    link = db.Column(db.String(255))
-    related_id = db.Column(db.Integer)  # ID of related item
-
-class WeatherData(db.Model):
-    __tablename__ = 'weather_data'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    location = db.Column(db.String(200), nullable=False)
-    temperature = db.Column(db.Float)
-    humidity = db.Column(db.Float)
-    description = db.Column(db.String(200))
-    recommendations = db.Column(db.Text)
-    forecast_date = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-# ==================== E-COMMERCE MODELS ====================
-
 class Cart(db.Model):
     __tablename__ = 'carts'
     
@@ -302,7 +162,7 @@ class Cart(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationship to get cart items
-    cart_items_rel = db.relationship('CartItem', backref='cart', lazy=True, cascade='all, delete-orphan')
+    cart_items = db.relationship('CartItem', backref='cart', lazy=True, cascade='all, delete-orphan')
 
 class CartItem(db.Model):
     __tablename__ = 'cart_items'
@@ -312,9 +172,6 @@ class CartItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('inventory_items.id'), nullable=False)
     quantity = db.Column(db.Integer, default=1)
     added_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Relationship to product
-    product = db.relationship('InventoryItem', backref='cart_items')
     
     __table_args__ = (db.UniqueConstraint('cart_id', 'product_id', name='unique_cart_product'),)
 
@@ -348,9 +205,6 @@ class OrderItem(db.Model):
     quantity = db.Column(db.Integer, nullable=False)
     unit_price = db.Column(db.Float, nullable=False)
     subtotal = db.Column(db.Float, nullable=False)
-    
-    # Relationship to product
-    product = db.relationship('InventoryItem', backref='order_items')
     
     __table_args__ = (db.UniqueConstraint('order_id', 'product_id', name='unique_order_product'),)
 
@@ -395,8 +249,6 @@ class Message(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('inventory_items.id'))
     order_id = db.Column(db.Integer, db.ForeignKey('orders.id'))
 
-# ==================== COMMUNITY MODELS ====================
-
 class CommunityPost(db.Model):
     __tablename__ = 'community_posts'
     
@@ -418,7 +270,6 @@ class CommunityPost(db.Model):
     answers = db.relationship('PostAnswer', backref='post', lazy=True, cascade='all, delete-orphan')
     followers = db.relationship('PostFollow', backref='post', lazy=True, cascade='all, delete-orphan')
     upvotes = db.relationship('PostUpvote', backref='post', lazy=True, cascade='all, delete-orphan')
-    attachments = db.relationship('PostAttachment', backref='post', lazy=True, cascade='all, delete-orphan')
 
 class PostAnswer(db.Model):
     __tablename__ = 'post_answers'
@@ -434,7 +285,6 @@ class PostAnswer(db.Model):
     
     # Relationships
     upvotes = db.relationship('AnswerUpvote', backref='answer', lazy=True, cascade='all, delete-orphan')
-    attachments = db.relationship('AnswerAttachment', backref='answer', lazy=True, cascade='all, delete-orphan')
 
 class PostFollow(db.Model):
     __tablename__ = 'post_follows'
@@ -466,40 +316,18 @@ class AnswerUpvote(db.Model):
     
     __table_args__ = (db.UniqueConstraint('answer_id', 'user_id', name='unique_answer_upvote'),)
 
-class PostAttachment(db.Model):
-    __tablename__ = 'post_attachments'
+class Notification(db.Model):
+    __tablename__ = 'notifications'
     
     id = db.Column(db.Integer, primary_key=True)
-    post_id = db.Column(db.Integer, db.ForeignKey('community_posts.id'), nullable=False)
-    filename = db.Column(db.String(255), nullable=False)
-    file_type = db.Column(db.String(50))
-    file_size = db.Column(db.Integer)
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-class AnswerAttachment(db.Model):
-    __tablename__ = 'answer_attachments'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    answer_id = db.Column(db.Integer, db.ForeignKey('post_answers.id'), nullable=False)
-    filename = db.Column(db.String(255), nullable=False)
-    file_type = db.Column(db.String(50))
-    file_size = db.Column(db.Integer)
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-# ==================== ADMIN MODELS ====================
-
-class AdminLog(db.Model):
-    __tablename__ = 'admin_logs'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    admin_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    action = db.Column(db.String(200), nullable=False)
-    details = db.Column(db.Text)
-    ip_address = db.Column(db.String(50))
-    user_agent = db.Column(db.Text)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    notification_type = db.Column(db.String(50))  # info, success, warning, danger
+    is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    admin = db.relationship('User', foreign_keys=[admin_id])
+    link = db.Column(db.String(255))
+    related_id = db.Column(db.Integer)  # ID of related item
 
 class SystemSetting(db.Model):
     __tablename__ = 'system_settings'
@@ -533,38 +361,4 @@ class FAQ(db.Model):
     category = db.Column(db.String(100))
     is_active = db.Column(db.Boolean, default=True)
     order = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-# ==================== PAYMENT MODELS ====================
-
-class Payment(db.Model):
-    __tablename__ = 'payments'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
-    transaction_id = db.Column(db.String(100), unique=True)
-    amount = db.Column(db.Float, nullable=False)
-    currency = db.Column(db.String(10), default='KES')
-    payment_method = db.Column(db.String(50))
-    status = db.Column(db.String(50), default='pending')  # pending, completed, failed, refunded
-    mpesa_code = db.Column(db.String(100))
-    phone_number = db.Column(db.String(20))
-    payment_date = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    order = db.relationship('Order', backref='payments')
-
-class MpesaTransaction(db.Model):
-    __tablename__ = 'mpesa_transactions'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    transaction_id = db.Column(db.String(100), unique=True)
-    merchant_request_id = db.Column(db.String(100))
-    checkout_request_id = db.Column(db.String(100))
-    result_code = db.Column(db.Integer)
-    result_desc = db.Column(db.String(255))
-    amount = db.Column(db.Float)
-    mpesa_receipt_number = db.Column(db.String(100))
-    phone_number = db.Column(db.String(20))
-    transaction_date = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
