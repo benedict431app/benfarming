@@ -7,14 +7,11 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 from sqlalchemy import desc, or_, and_, func
+from config import Config
 from models import db, User, InventoryItem, Cart, CartItem, Order, OrderItem, Notification, CommunityPost, PostAnswer, PostFollow, SystemSetting
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-123')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///agriconnect.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config.from_object(Config)
 
 # Initialize extensions
 db.init_app(app)
@@ -55,6 +52,29 @@ def admin_required(f):
 # Create necessary directories
 os.makedirs('uploads/products', exist_ok=True)
 os.makedirs('uploads/profiles', exist_ok=True)
+
+# ==================== INITIALIZATION ====================
+
+def init_app():
+    """Initialize the application"""
+    with app.app_context():
+        # Create tables
+        db.create_all()
+        
+        # Create default admin user
+        if not User.query.filter_by(email='admin@agriconnect.com').first():
+            admin = User(
+                email='admin@agriconnect.com',
+                full_name='System Administrator',
+                user_type='admin',
+                is_admin=True,
+                is_verified=True,
+                is_active=True
+            )
+            admin.set_password('Admin@123')
+            db.session.add(admin)
+            db.session.commit()
+            print("✅ Admin user created: admin@agriconnect.com / Admin@123")
 
 # ==================== BASIC ROUTES ====================
 
@@ -103,7 +123,8 @@ def register():
             full_name=full_name,
             user_type=user_type,
             phone_number=phone_number,
-            location=location
+            location=location,
+            is_active=True
         )
         user.set_password(password)
         
@@ -544,7 +565,11 @@ def checkout():
             db.session.rollback()
             flash(f'Error processing order: {str(e)}', 'danger')
     
-    return render_template('checkout.html')
+    # Get cart items for checkout page
+    cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
+    total_price = sum(item.product.price * item.quantity for item in cart_items if item.product)
+    
+    return render_template('checkout.html', cart_items=cart_items, total_price=total_price)
 
 @app.route('/order/confirmation/<int:order_id>')
 @login_required
@@ -757,6 +782,36 @@ def profile():
     """User profile"""
     return render_template('profile.html')
 
+@app.route('/profile/edit', methods=['GET', 'POST'])
+@login_required
+def edit_profile():
+    """Edit user profile"""
+    if request.method == 'POST':
+        current_user.full_name = request.form.get('full_name')
+        current_user.phone_number = request.form.get('phone_number')
+        current_user.location = request.form.get('location')
+        current_user.address = request.form.get('address')
+        
+        # Handle profile picture
+        if 'profile_picture' in request.files:
+            file = request.files['profile_picture']
+            if file and file.filename != '':
+                filename = secure_filename(f"{current_user.id}_{file.filename}")
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'profiles', filename)
+                file.save(filepath)
+                current_user.profile_picture = filename
+        
+        # Update agrovet business info
+        if current_user.user_type == 'agrovet':
+            current_user.business_name = request.form.get('business_name')
+            current_user.business_description = request.form.get('business_description')
+        
+        db.session.commit()
+        flash('Profile updated successfully!', 'success')
+        return redirect(url_for('profile'))
+    
+    return render_template('edit_profile.html')
+
 # ==================== ERROR HANDLERS ====================
 
 @app.errorhandler(404)
@@ -768,28 +823,22 @@ def internal_error(error):
     db.session.rollback()
     return render_template('errors/500.html'), 500
 
-# ==================== INITIALIZATION ====================
+# ==================== FILE UPLOADS ====================
 
-def init_app():
-    """Initialize the application"""
-    with app.app_context():
-        db.create_all()
-        
-        # Create default admin user
-        if not User.query.filter_by(email='admin@agriconnect.com').first():
-            admin = User(
-                email='admin@agriconnect.com',
-                full_name='System Administrator',
-                user_type='admin',
-                is_admin=True,
-                is_verified=True
-            )
-            admin.set_password('Admin@123')
-            db.session.add(admin)
-            db.session.commit()
+@app.route('/uploads/<path:filename>')
+def uploaded_files(filename):
+    """Serve uploaded files"""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+# ==================== MAIN ====================
 
 if __name__ == '__main__':
+    # Initialize the app
     init_app()
+    
+    # Get port from environment or use default
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    
+    # Run the app
     app.run(host='0.0.0.0', port=port, debug=debug)
