@@ -8,15 +8,16 @@ class Config:
     # Security
     SECRET_KEY = os.getenv('SECRET_KEY', os.getenv('SESSION_SECRET', 'dev-secret-key-change-in-production'))
     
-    # Database - Use PostgreSQL on Render, SQLite locally
+    # Database - Use SQLite (works on Render with file system)
+    # On Render, the file system is ephemeral, but SQLite will work
+    # For persistence, consider mounting a volume or using Render's disk
     if os.environ.get('RENDER'):
-        DATABASE_URL = os.environ.get('DATABASE_URL')
-        if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
-            DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+        # On Render, use a persistent location
+        SQLALCHEMY_DATABASE_URI = 'sqlite:////tmp/agriconnect.db'  # /tmp is writable on Render
     else:
-        DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///database.db')
+        # Local development
+        SQLALCHEMY_DATABASE_URI = 'sqlite:///agriconnect.db'
     
-    SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # File uploads
@@ -53,14 +54,6 @@ class Config:
     MPESA_CONSUMER_SECRET = os.getenv('MPESA_CONSUMER_SECRET', '')
     MPESA_SHORTCODE = os.getenv('MPESA_SHORTCODE', '')
     MPESA_PASSKEY = os.getenv('MPESA_PASSKEY', '')
-    
-    # Email settings
-    MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
-    MAIL_PORT = int(os.getenv('MAIL_PORT', 587))
-    MAIL_USE_TLS = os.getenv('MAIL_USE_TLS', 'True').lower() == 'true'
-    MAIL_USERNAME = os.getenv('MAIL_USERNAME')
-    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD')
-    MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', MAIL_USERNAME)
     
     # Site settings
     SITE_NAME = 'AgriConnect'
