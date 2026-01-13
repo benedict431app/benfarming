@@ -8,12 +8,12 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from werkzeug.utils import secure_filename
 from sqlalchemy import desc, or_, and_, func
 from config import Config
-from models import db, User, InventoryItem, Cart, CartItem, Order, OrderItem, Notification, CommunityPost, PostAnswer, PostFollow, SystemSetting
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
 # Initialize extensions
+from models import db
 db.init_app(app)
 
 login_manager = LoginManager()
@@ -24,10 +24,12 @@ login_manager.login_message_category = 'warning'
 
 @login_manager.user_loader
 def load_user(user_id):
+    from models import User
     return User.query.get(int(user_id))
 
 def create_notification(user_id, title, message, notification_type='info'):
     """Create a notification for a user"""
+    from models import Notification
     notification = Notification(
         user_id=user_id,
         title=title,
@@ -58,6 +60,9 @@ os.makedirs('uploads/profiles', exist_ok=True)
 def init_app():
     """Initialize the application"""
     with app.app_context():
+        # Import models inside context
+        from models import User, Cart, SystemSetting
+        
         # Create tables
         db.create_all()
         
@@ -81,6 +86,8 @@ def init_app():
 @app.route('/')
 def index():
     """Homepage"""
+    from models import InventoryItem, CommunityPost
+    
     # Get featured products
     featured_products = InventoryItem.query.filter_by(
         is_active=True
@@ -96,6 +103,8 @@ def index():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """User registration"""
+    from models import User, Cart
+    
     if current_user.is_authenticated:
         return redirect(url_for('index'))
     
@@ -149,6 +158,8 @@ def register():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """User login"""
+    from models import User
+    
     if current_user.is_authenticated:
         return redirect(url_for('index'))
     
@@ -198,6 +209,8 @@ def logout():
 @login_required
 def farmer_dashboard():
     """Farmer dashboard"""
+    from models import Notification, Order
+    
     if current_user.user_type != 'farmer':
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
@@ -222,6 +235,8 @@ def farmer_dashboard():
 @login_required
 def agrovet_dashboard():
     """Agrovet dashboard"""
+    from models import InventoryItem, Order
+    
     if current_user.user_type != 'agrovet':
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
@@ -249,6 +264,8 @@ def agrovet_dashboard():
 @login_required
 def agrovet_products():
     """Agrovet product management"""
+    from models import InventoryItem
+    
     if current_user.user_type != 'agrovet':
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
@@ -273,6 +290,8 @@ def agrovet_products():
 @login_required
 def add_product():
     """Add new product"""
+    from models import InventoryItem
+    
     if current_user.user_type != 'agrovet':
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
@@ -306,6 +325,8 @@ def add_product():
 @app.route('/marketplace')
 def marketplace():
     """Marketplace - Browse all products"""
+    from models import InventoryItem, User
+    
     category = request.args.get('category', 'all')
     search = request.args.get('search', '')
     
@@ -338,6 +359,8 @@ def marketplace():
 @app.route('/product/<int:product_id>')
 def product_detail(product_id):
     """Product detail page"""
+    from models import InventoryItem, User
+    
     product = InventoryItem.query.get_or_404(product_id)
     
     if not product.is_active:
@@ -354,6 +377,8 @@ def product_detail(product_id):
 @app.route('/agrovet/<int:agrovet_id>')
 def agrovet_detail(agrovet_id):
     """Agrovet detail page"""
+    from models import User, InventoryItem
+    
     agrovet = User.query.get_or_404(agrovet_id)
     
     if agrovet.user_type != 'agrovet' or not agrovet.is_active:
@@ -376,6 +401,8 @@ def agrovet_detail(agrovet_id):
 @login_required
 def view_cart():
     """View shopping cart"""
+    from models import Cart, CartItem
+    
     cart = current_user.cart
     
     if not cart:
@@ -398,6 +425,8 @@ def view_cart():
 @login_required
 def add_to_cart(product_id):
     """Add product to cart"""
+    from models import InventoryItem, Cart, CartItem
+    
     product = InventoryItem.query.get_or_404(product_id)
     
     if not product.is_active or product.quantity <= 0:
@@ -440,6 +469,8 @@ def add_to_cart(product_id):
 @login_required
 def update_cart_item(item_id):
     """Update cart item quantity"""
+    from models import CartItem
+    
     cart_item = CartItem.query.get_or_404(item_id)
     
     if cart_item.cart.user_id != current_user.id:
@@ -462,6 +493,8 @@ def update_cart_item(item_id):
 @login_required
 def remove_from_cart(item_id):
     """Remove product from cart"""
+    from models import CartItem
+    
     cart_item = CartItem.query.get_or_404(item_id)
     
     if cart_item.cart.user_id != current_user.id:
@@ -476,6 +509,8 @@ def remove_from_cart(item_id):
 @login_required
 def checkout():
     """Checkout process"""
+    from models import Cart, CartItem, Order, OrderItem
+    
     cart = current_user.cart
     
     if not cart or CartItem.query.filter_by(cart_id=cart.id).count() == 0:
@@ -494,7 +529,7 @@ def checkout():
             # Group items by agrovet
             agrovet_items = {}
             
-            for cart_item in cart.cart_items_rel:
+            for cart_item in cart.cart_items:
                 if cart_item.product:
                     agrovet_id = cart_item.product.agrovet_id
                     if agrovet_id not in agrovet_items:
@@ -575,6 +610,8 @@ def checkout():
 @login_required
 def order_confirmation(order_id):
     """Order confirmation page"""
+    from models import Order
+    
     order = Order.query.get_or_404(order_id)
     
     if order.user_id != current_user.id:
@@ -587,6 +624,8 @@ def order_confirmation(order_id):
 @login_required
 def my_orders():
     """User order history"""
+    from models import Order
+    
     orders = Order.query.filter_by(user_id=current_user.id).order_by(
         desc(Order.created_at)
     ).all()
@@ -598,6 +637,8 @@ def my_orders():
 @app.route('/community')
 def community_home():
     """Community homepage"""
+    from models import CommunityPost
+    
     search = request.args.get('search', '')
     
     query = CommunityPost.query
@@ -618,6 +659,8 @@ def community_home():
 @login_required
 def create_community_post():
     """Create community post"""
+    from models import CommunityPost
+    
     if request.method == 'POST':
         title = request.form.get('title')
         content = request.form.get('content')
@@ -647,6 +690,8 @@ def create_community_post():
 @app.route('/community/post/<int:post_id>')
 def view_community_post(post_id):
     """View community post"""
+    from models import CommunityPost, PostAnswer
+    
     post = CommunityPost.query.get_or_404(post_id)
     
     # Increment view count
@@ -668,6 +713,8 @@ def view_community_post(post_id):
 @login_required
 def add_post_answer(post_id):
     """Add answer to post"""
+    from models import CommunityPost, PostAnswer
+    
     post = CommunityPost.query.get_or_404(post_id)
     
     content = request.form.get('content')
@@ -693,6 +740,8 @@ def add_post_answer(post_id):
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     """Admin login"""
+    from models import User
+    
     if current_user.is_authenticated and current_user.is_admin:
         return redirect(url_for('admin_dashboard'))
     
@@ -718,6 +767,8 @@ def admin_login():
 @admin_required
 def admin_dashboard():
     """Admin dashboard"""
+    from models import User, InventoryItem, Order
+    
     # Statistics
     total_users = User.query.count()
     total_farmers = User.query.filter_by(user_type='farmer').count()
@@ -744,6 +795,8 @@ def admin_dashboard():
 @admin_required
 def admin_users():
     """Admin user management"""
+    from models import User
+    
     search = request.args.get('search', '')
     
     query = User.query
@@ -764,6 +817,8 @@ def admin_users():
 @admin_required
 def toggle_user_active(user_id):
     """Toggle user active status"""
+    from models import User
+    
     user = User.query.get_or_404(user_id)
     
     user.is_active = not user.is_active
