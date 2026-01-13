@@ -8,18 +8,22 @@ db = SQLAlchemy()
 
 # Association tables
 cart_items = db.Table('cart_items',
-    db.Column('cart_id', db.Integer, db.ForeignKey('carts.id'), primary_key=True),
-    db.Column('product_id', db.Integer, db.ForeignKey('inventory_items.id'), primary_key=True),
+    db.Column('id', db.Integer, primary_key=True),
+    db.Column('cart_id', db.Integer, db.ForeignKey('carts.id')),
+    db.Column('product_id', db.Integer, db.ForeignKey('inventory_items.id')),
     db.Column('quantity', db.Integer, default=1),
-    db.Column('added_at', db.DateTime, default=datetime.utcnow)
+    db.Column('added_at', db.Column(db.DateTime, default=datetime.utcnow)),
+    db.UniqueConstraint('cart_id', 'product_id', name='unique_cart_product')
 )
 
 order_items = db.Table('order_items',
-    db.Column('order_id', db.Integer, db.ForeignKey('orders.id'), primary_key=True),
-    db.Column('product_id', db.Integer, db.ForeignKey('inventory_items.id'), primary_key=True),
+    db.Column('id', db.Integer, primary_key=True),
+    db.Column('order_id', db.Integer, db.ForeignKey('orders.id')),
+    db.Column('product_id', db.Integer, db.ForeignKey('inventory_items.id')),
     db.Column('quantity', db.Integer, nullable=False),
     db.Column('unit_price', db.Float, nullable=False),
-    db.Column('subtotal', db.Float, nullable=False)
+    db.Column('subtotal', db.Float, nullable=False),
+    db.UniqueConstraint('order_id', 'product_id', name='unique_order_product')
 )
 
 class User(UserMixin, db.Model):
@@ -50,16 +54,24 @@ class User(UserMixin, db.Model):
     rating = db.Column(db.Float, default=0.0)
     total_reviews = db.Column(db.Integer, default=0)
     
-    # Relationships
+    # Relationships - explicitly specify foreign_keys
     inventory_items = db.relationship('InventoryItem', backref='agrovet', lazy=True, cascade='all, delete-orphan')
     sales = db.relationship('Sale', backref='agrovet', lazy=True, cascade='all, delete-orphan')
     customers = db.relationship('Customer', backref='agrovet', lazy=True, cascade='all, delete-orphan')
     disease_reports = db.relationship('DiseaseReport', backref='farmer', lazy=True, cascade='all, delete-orphan')
     notifications = db.relationship('Notification', backref='user', lazy=True, cascade='all, delete-orphan')
+    
+    # E-commerce relationships
     cart = db.relationship('Cart', backref='user', uselist=False, cascade='all, delete-orphan')
-    orders = db.relationship('Order', backref='user', lazy=True, cascade='all, delete-orphan')
+    orders_as_customer = db.relationship('Order', foreign_keys='Order.user_id', backref='customer', lazy=True)
+    orders_as_agrovet = db.relationship('Order', foreign_keys='Order.agrovet_id', backref='agrovet', lazy=True)
+    
+    # Reviews
     reviews_given = db.relationship('Review', foreign_keys='Review.user_id', backref='reviewer', lazy=True)
-    reviews_received = db.relationship('Review', foreign_keys='Review.agrovet_id', backref='agrovet', lazy=True)
+    reviews_received = db.relationship('Review', foreign_keys='Review.agrovet_id', backref='agrovet_reviewed', lazy=True)
+    product_reviews_given = db.relationship('ProductReview', foreign_keys='ProductReview.user_id', backref='reviewer', lazy=True)
+    
+    # Messaging
     messages_sent = db.relationship('Message', foreign_keys='Message.sender_id', backref='sender', lazy=True)
     messages_received = db.relationship('Message', foreign_keys='Message.receiver_id', backref='receiver', lazy=True)
     
@@ -289,25 +301,22 @@ class Cart(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    products = db.relationship('InventoryItem', secondary=cart_items, lazy='subquery',
-                              backref=db.backref('carts', lazy=True))
+    # Relationship to get cart items
+    cart_items_rel = db.relationship('CartItem', backref='cart', lazy=True, cascade='all, delete-orphan')
+
+class CartItem(db.Model):
+    __tablename__ = 'cart_items'
     
-    @property
-    def total_items(self):
-        return sum(item.quantity for item in self.cart_items)
+    id = db.Column(db.Integer, primary_key=True)
+    cart_id = db.Column(db.Integer, db.ForeignKey('carts.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('inventory_items.id'), nullable=False)
+    quantity = db.Column(db.Integer, default=1)
+    added_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    @property
-    def total_price(self):
-        total = 0
-        for item in self.cart_items:
-            product = InventoryItem.query.get(item.product_id)
-            if product:
-                total += product.current_price * item.quantity
-        return total
+    # Relationship to product
+    product = db.relationship('InventoryItem', backref='cart_items')
     
-    @property
-    def cart_items(self):
-        return db.session.query(cart_items).filter_by(cart_id=self.id).all()
+    __table_args__ = (db.UniqueConstraint('cart_id', 'product_id', name='unique_cart_product'),)
 
 class Order(db.Model):
     __tablename__ = 'orders'
@@ -321,20 +330,29 @@ class Order(db.Model):
     billing_address = db.Column(db.Text)
     payment_method = db.Column(db.String(50), nullable=False)  # mpesa, cash, card
     payment_status = db.Column(db.String(50), default='pending')  # pending, completed, failed
-    order_status = db.Column(db.String(50), default='pending')  # pending, processing, shipped, delivered, cancelled
+    status = db.Column(db.String(50), default='pending')  # pending, processing, shipped, delivered, cancelled
     mpesa_code = db.Column(db.String(100))
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    agrovet = db.relationship('User', foreign_keys=[agrovet_id], backref='agrovet_orders')
-    items = db.relationship('InventoryItem', secondary=order_items, lazy='subquery',
-                           backref=db.backref('orders', lazy=True))
+    order_items = db.relationship('OrderItem', backref='order', lazy=True, cascade='all, delete-orphan')
+
+class OrderItem(db.Model):
+    __tablename__ = 'order_items'
     
-    @property
-    def order_items_details(self):
-        return db.session.query(order_items).filter_by(order_id=self.id).all()
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('inventory_items.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    unit_price = db.Column(db.Float, nullable=False)
+    subtotal = db.Column(db.Float, nullable=False)
+    
+    # Relationship to product
+    product = db.relationship('InventoryItem', backref='order_items')
+    
+    __table_args__ = (db.UniqueConstraint('order_id', 'product_id', name='unique_order_product'),)
 
 class Review(db.Model):
     __tablename__ = 'reviews'
