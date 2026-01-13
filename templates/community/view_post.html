@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-9">
+            <!-- Post -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h1 class="card-title mb-2">{{ post.title }}</h1>
+                            <div class="d-flex align-items-center mb-3">
+                                <img src="{{ post.user.profile_picture or url_for('static', filename='images/default-avatar.png') }}" 
+                                     class="rounded-circle me-2" width="40" height="40" alt="{{ post.user.full_name }}">
+                                <div>
+                                    <strong>{{ post.user.full_name }}</strong>
+                                    <div class="text-muted small">
+                                        {{ post.created_at|datetime }}
+                                        {% if post.updated_at != post.created_at %}
+                                        (Edited {{ post.updated_at|datetime }})
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex">
+                            {% if post.user_id == current_user.id %}
+                            <button class="btn btn-outline-success btn-sm me-2" onclick="markResolved({{ post.id }})">
+                                {% if post.is_resolved %}
+                                <i class="fas fa-check-circle"></i> Mark Unsolved
+                                {% else %}
+                                <i class="fas fa-question-circle"></i> Mark Solved
+                                {% endif %}
+                            </button>
+                            {% endif %}
+                            <button class="btn btn-outline-warning btn-sm me-2 follow-btn" data-post-id="{{ post.id }}">
+                                {% if is_following %}
+                                <i class="fas fa-star text-warning"></i> Following
+                                {% else %}
+                                <i class="far fa-star"></i> Follow
+                                {% endif %}
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm upvote-btn" data-post-id="{{ post.id }}">
+                                {% if has_upvoted %}
+                                <i class="fas fa-arrow-up text-primary"></i>
+                                {% else %}
+                                <i class="fas fa-arrow-up"></i>
+                                {% endif %}
+                                <span class="upvote-count">{{ post.upvotes|length }}</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <span class="badge bg-secondary">{{ post.post_type }}</span>
+                        {% if post.category %}
+                        <span class="badge bg-info">{{ post.category }}</span>
+                        {% endif %}
+                        {% if post.is_resolved %}
+                        <span class="badge bg-success">Solved</span>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="post-content mb-4">
+                        {{ post.content|safe }}
+                    </div>
+                    
+                    <div class="d-flex justify-content-between text-muted">
+                        <div>
+                            <i class="fas fa-eye"></i> {{ post.views }} views
+                            <i class="fas fa-comment ms-3"></i> {{ post.answers|length }} answers
+                        </div>
+                        <div>
+                            <i class="fas fa-star"></i> <span class="follower-count">{{ post.followers|length }}</span> followers
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Answers -->
+            <h3 class="mb-3">{{ post.answers|length }} Answers</h3>
+            
+            {% for answer in answers %}
+            <div class="card mb-3 {% if answer.is_accepted %}border-success{% endif %}">
+                <div class="card-body">
+                    <div class="d-flex">
+                        <div class="flex-shrink-0 me-3 text-center">
+                            <img src="{{ answer.user.profile_picture or url_for('static', filename='images/default-avatar.png') }}" 
+                                 class="rounded-circle mb-2" width="50" height="50" alt="{{ answer.user.full_name }}">
+                            <button class="btn btn-sm {% if answer_upvotes[answer.id] %}btn-primary{% else %}btn-outline-primary{% endif %} answer-upvote-btn" 
+                                    data-answer-id="{{ answer.id }}">
+                                <i class="fas fa-arrow-up"></i>
+                                <span class="answer-upvote-count">{{ answer.upvotes|length }}</span>
+                            </button>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <strong>{{ answer.user.full_name }}</strong>
+                                    <small class="text-muted ms-2">{{ answer.created_at|datetime }}</small>
+                                    {% if answer.is_accepted %}
+                                    <span class="badge bg-success ms-2">
+                                        <i class="fas fa-check"></i> Accepted Answer
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                {% if post.user_id == current_user.id and not post.is_resolved %}
+                                <button class="btn btn-sm btn-outline-success" onclick="acceptAnswer({{ answer.id }})">
+                                    <i class="fas fa-check"></i> Accept Answer
+                                </button>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="answer-content">
+                                {{ answer.content|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            
+            <!-- Answer Form -->
+            {% if not post.is_resolved %}
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title">Your Answer</h4>
+                    <form method="POST" action="{{ url_for('post_answer', post_id=post.id) }}">
+                        <div class="mb-3">
+                            <textarea class="form-control" name="content" rows="6" 
+                                      placeholder="Share your knowledge or experience..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Post Answer</button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i> This question has been marked as solved. While you can still contribute, consider that the original poster has found their solution.
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Post Info</h5>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Posted</span>
+                            <span>{{ post.created_at|datetime }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Answers</span>
+                            <span>{{ post.answers|length }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Views</span>
+                            <span>{{ post.views }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Followers</span>
+                            <span id="follower-count">{{ post.followers|length }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Upvotes</span>
+                            <span id="upvote-count">{{ post.upvotes|length }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h5 class="card-title">Related Posts</h5>
+                    {% set related_posts = [] %}
+                    {% for p in CommunityPost.query.filter(CommunityPost.category == post.category, CommunityPost.id != post.id).limit(5).all() %}
+                    <div class="mb-2">
+                        <a href="{{ url_for('view_post', post_id=p.id) }}" class="text-decoration-none">
+                            {{ p.title[:50] }}...
+                        </a>
+                        <small class="text-muted d-block">{{ p.answers|length }} answers</small>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No related posts</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function markResolved(postId) {
+    const response = await fetch(`/community/post/${postId}/mark-resolved`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+    
+    const result = await response.json();
+    if (result.success) {
+        location.reload();
+    }
+}
+
+async function acceptAnswer(answerId) {
+    const response = await fetch(`/community/answer/${answerId}/accept`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+    
+    const result = await response.json();
+    if (result.success) {
+        location.reload();
+    }
+}
+
+// Follow button
+document.querySelector('.follow-btn').addEventListener('click', async function() {
+    const postId = this.dataset.postId;
+    const response = await fetch(`/community/post/${postId}/follow`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+    
+    const result = await response.json();
+    if (result.success) {
+        const icon = this.querySelector('i');
+        if (result.action === 'followed') {
+            icon.className = 'fas fa-star text-warning';
+            this.innerHTML = '<i class="fas fa-star text-warning"></i> Following';
+        } else {
+            icon.className = 'far fa-star';
+            this.innerHTML = '<i class="far fa-star"></i> Follow';
+        }
+        document.getElementById('follower-count').textContent = result.followers_count;
+    }
+});
+
+// Post upvote
+document.querySelector('.upvote-btn').addEventListener('click', async function() {
+    const postId = this.dataset.postId;
+    const response = await fetch(`/community/post/${postId}/upvote`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+    
+    const result = await response.json();
+    if (result.success) {
+        const icon = this.querySelector('i');
+        if (result.action === 'added') {
+            icon.className = 'fas fa-arrow-up text-primary';
+        } else {
+            icon.className = 'fas fa-arrow-up';
+        }
+        document.querySelector('.upvote-count').textContent = result.upvotes_count;
+        document.getElementById('upvote-count').textContent = result.upvotes_count;
+    }
+});
+
+// Answer upvotes
+document.querySelectorAll('.answer-upvote-btn').forEach(button => {
+    button.addEventListener('click', async function() {
+        const answerId = this.dataset.answerId;
+        const response = await fetch(`/community/answer/${answerId}/upvote`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            const countSpan = this.querySelector('.answer-upvote-count');
+            countSpan.textContent = result.upvotes_count;
+            
+            if (result.action === 'added') {
+                this.className = 'btn btn-sm btn-primary answer-upvote-btn';
+            } else {
+                this.className = 'btn btn-sm btn-outline-primary answer-upvote-btn';
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
