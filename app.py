@@ -4,8 +4,9 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 import requests
+from sqlalchemy import desc, or_, func
 from config import Config
-from models import db, User, InventoryItem, Customer, Sale, SaleItem, Communication, DiseaseReport, Notification, WeatherData
+from models import db, User, InventoryItem, Customer, Sale, SaleItem, Communication, DiseaseReport, Notification, WeatherData, CommunityPost, PostAnswer, PostFollow, PostUpvote, AnswerUpvote
 import google.generativeai as genai
 from PIL import Image
 import io
@@ -36,6 +37,21 @@ def load_user(user_id):
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
+def create_notification(user_id, title, message, notification_type='info', related_id=None):
+    """Helper function to create notifications"""
+    notification = Notification(
+        user_id=user_id,
+        title=title,
+        message=message,
+        notification_type=notification_type,
+        related_id=related_id
+    )
+    db.session.add(notification)
+    return notification
+
+# Create uploads directory if it doesn't exist
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Create database tables
 with app.app_context():
@@ -79,7 +95,7 @@ def register():
         
         if 'profile_picture' in request.files:
             file = request.files['profile_picture']
-            if file and allowed_file(file.filename):
+            if file and file.filename != '' and allowed_file(file.filename):
                 filename = secure_filename(f"{email}_{file.filename}")
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(filepath)
@@ -127,493 +143,488 @@ def farmer_dashboard():
     notifications = Notification.query.filter_by(user_id=current_user.id, is_read=False).order_by(Notification.created_at.desc()).limit(5).all()
     disease_reports = DiseaseReport.query.filter_by(farmer_id=current_user.id).order_by(DiseaseReport.created_at.desc()).limit(10).all()
     
-    return render_template('farmer/dashboard.html', notifications=notifications, disease_reports=disease_reports)
-
-@app.route('/farmer/detect-disease', methods=['GET', 'POST'])
-@login_required
-def detect_disease():
-    if current_user.user_type != 'farmer':
-        flash('Access denied', 'error')
-        return redirect(url_for('index'))
+    # Get recent community posts
+    recent_posts = CommunityPost.query.filter_by(user_id=current_user.id).order_by(desc(CommunityPost.created_at)).limit(5).all()
     
+    return render_template('farmer/dashboard.html', 
+                         notifications=notifications, 
+                         disease_reports=disease_reports,
+                         recent_posts=recent_posts)
+
+# ... [Keep all your existing routes for disease detection, weather, etc.] ...
+
+# ==================== COMMUNITY ROUTES ====================
+
+@app.route('/community')
+@login_required
+def community_home():
+    """Community homepage showing recent posts"""
+    page = request.args.get('page', 1, type=int)
+    category = request.args.get('category', 'all')
+    post_type = request.args.get('type', 'all')
+    search = request.args.get('search', '')
+    
+    # Base query
+    query = CommunityPost.query
+    
+    # Apply filters
+    if category != 'all' and category:
+        query = query.filter(CommunityPost.category == category)
+    if post_type != 'all' and post_type:
+        query = query.filter(CommunityPost.post_type == post_type)
+    if search:
+        query = query.filter(
+            or_(
+                CommunityPost.title.ilike(f'%{search}%'),
+                CommunityPost.content.ilike(f'%{search}%')
+            )
+        )
+    
+    # Get paginated posts
+    posts = query.order_by(desc(CommunityPost.created_at)).paginate(
+        page=page, per_page=10, error_out=False
+    )
+    
+    # Get user's followed posts
+    followed_post_ids = [f.post_id for f in PostFollow.query.filter_by(user_id=current_user.id).all()]
+    
+    # Get categories for filter dropdown
+    categories = db.session.query(CommunityPost.category).distinct().all()
+    categories = [c[0] for c in categories if c[0]]
+    
+    return render_template('community/home.html', 
+                         posts=posts, 
+                         categories=categories,
+                         followed_post_ids=followed_post_ids,
+                         current_category=category,
+                         current_type=post_type,
+                         search=search)
+
+@app.route('/community/post/new', methods=['GET', 'POST'])
+@login_required
+def create_post():
+    """Create a new community post"""
     if request.method == 'POST':
-        if 'plant_image' not in request.files:
-            return jsonify({'error': 'No image provided'}), 400
+        title = request.form.get('title', '').strip()
+        content = request.form.get('content', '').strip()
+        post_type = request.form.get('post_type', 'question')
+        category = request.form.get('category', 'general')
         
-        file = request.files['plant_image']
-        description = request.form.get('description', '')
+        if not title or not content:
+            flash('Title and content are required', 'error')
+            return redirect(url_for('create_post'))
         
-        if file and allowed_file(file.filename):
-            filename = secure_filename(f"plant_{current_user.id}_{datetime.utcnow().timestamp()}_{file.filename}")
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            
-            try:
-                headers = {
-                    'Authorization': f'Bearer {cohere_api_key}',
-                    'Content-Type': 'application/json',
-                }
-                
-                chat_payload = {
-                    'model': 'c4ai-aya-expanse-8b',
-                    'message': f"As an agricultural expert, analyze this plant health situation: {description}. Provide possible disease names, treatment recommendations, and prevention tips.",
-                    'temperature': 0.7,
-                    'max_tokens': 600
-                }
-                
-                response = requests.post('https://api.cohere.ai/v1/chat', json=chat_payload, headers=headers)
-                result = response.json()
-                
-                if response.status_code == 200 and 'text' in result:
-                    analysis = result['text']
-                else:
-                    analysis = "Unable to analyze plant health at the moment. Please consult with an agricultural officer."
-                
-                report = DiseaseReport(
-                    farmer_id=current_user.id,
-                    plant_image=filename,
-                    plant_description=description,
-                    treatment_recommendation=analysis,
-                    latitude=current_user.latitude,
-                    longitude=current_user.longitude,
-                    location=current_user.location
-                )
-                db.session.add(report)
-                db.session.commit()
-                
-                return jsonify({
-                    'success': True,
-                    'analysis': analysis,
-                    'report_id': report.id
-                })
-                
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-    
-    return render_template('farmer/detect_disease.html')
-
-@app.route('/farmer/weather')
-@login_required
-def farmer_weather():
-    if current_user.user_type != 'farmer':
-        flash('Access denied', 'error')
-        return redirect(url_for('index'))
-    
-    location = request.args.get('location', current_user.location or 'Nairobi')
-    
-    try:
-        weather_url = f"http://api.openweathermap.org/data/2.5/weather?q={location}&appid={app.config['OPENWEATHER_API_KEY']}&units=metric"
-        response = requests.get(weather_url)
-        weather_data = response.json()
-        
-        forecast_url = f"http://api.openweathermap.org/data/2.5/forecast?q={location}&appid={app.config['OPENWEATHER_API_KEY']}&units=metric"
-        forecast_response = requests.get(forecast_url)
-        forecast_data = forecast_response.json()
-        
-        return render_template('farmer/weather.html', weather=weather_data, forecast=forecast_data)
-    except Exception as e:
-        flash(f'Error fetching weather data: {str(e)}', 'error')
-        return render_template('farmer/weather.html', weather=None, forecast=None)
-
-@app.route('/farmer/agrovets')
-@login_required
-def farmer_agrovets():
-    if current_user.user_type != 'farmer':
-        flash('Access denied', 'error')
-        return redirect(url_for('index'))
-    
-    agrovets = User.query.filter_by(user_type='agrovet', is_active=True).all()
-    return render_template('farmer/agrovets.html', agrovets=agrovets)
-
-@app.route('/agrovet/dashboard')
-@login_required
-def agrovet_dashboard():
-    if current_user.user_type != 'agrovet':
-        flash('Access denied', 'error')
-        return redirect(url_for('index'))
-    
-    total_products = InventoryItem.query.filter_by(agrovet_id=current_user.id).count()
-    low_stock_items = InventoryItem.query.filter_by(agrovet_id=current_user.id).filter(InventoryItem.quantity <= InventoryItem.reorder_level).count()
-    total_customers = Customer.query.filter_by(agrovet_id=current_user.id).count()
-    
-    today = datetime.utcnow().date()
-    today_sales = Sale.query.filter_by(agrovet_id=current_user.id).filter(db.func.date(Sale.sale_date) == today).all()
-    today_revenue = sum(sale.total_amount for sale in today_sales)
-    
-    recent_sales = Sale.query.filter_by(agrovet_id=current_user.id).order_by(Sale.sale_date.desc()).limit(10).all()
-    notifications = Notification.query.filter_by(user_id=current_user.id, is_read=False).order_by(Notification.created_at.desc()).limit(5).all()
-    
-    return render_template('agrovet/dashboard.html', 
-                         total_products=total_products,
-                         low_stock_items=low_stock_items,
-                         total_customers=total_customers,
-                         today_revenue=today_revenue,
-                         recent_sales=recent_sales,
-                         notifications=notifications)
-
-@app.route('/agrovet/inventory')
-@login_required
-def agrovet_inventory():
-    if current_user.user_type != 'agrovet':
-        flash('Access denied', 'error')
-        return redirect(url_for('index'))
-    
-    items = InventoryItem.query.filter_by(agrovet_id=current_user.id).all()
-    return render_template('agrovet/inventory.html', items=items)
-
-@app.route('/agrovet/inventory/add', methods=['GET', 'POST'])
-@login_required
-def add_inventory():
-    if current_user.user_type != 'agrovet':
-        flash('Access denied', 'error')
-        return redirect(url_for('index'))
-    
-    if request.method == 'POST':
-        item = InventoryItem(
-            agrovet_id=current_user.id,
-            product_name=request.form.get('product_name'),
-            category=request.form.get('category'),
-            description=request.form.get('description'),
-            quantity=int(request.form.get('quantity', 0)),
-            unit=request.form.get('unit'),
-            price=float(request.form.get('price')),
-            cost_price=float(request.form.get('cost_price', 0)),
-            reorder_level=int(request.form.get('reorder_level', 10)),
-            supplier=request.form.get('supplier'),
-            sku=request.form.get('sku')
+        # Create the post
+        post = CommunityPost(
+            user_id=current_user.id,
+            title=title,
+            content=content,
+            post_type=post_type,
+            category=category
         )
         
-        db.session.add(item)
+        # Auto-follow the post
+        follow = PostFollow(post=post, user_id=current_user.id)
+        
+        db.session.add(post)
+        db.session.add(follow)
         db.session.commit()
         
-        flash('Product added successfully!', 'success')
-        return redirect(url_for('agrovet_inventory'))
+        flash('Post created successfully! You are now following this post.', 'success')
+        return redirect(url_for('view_post', post_id=post.id))
     
-    return render_template('agrovet/add_inventory.html')
+    return render_template('community/create_post.html')
 
-@app.route('/agrovet/inventory/edit/<int:item_id>', methods=['GET', 'POST'])
+@app.route('/community/post/<int:post_id>')
 @login_required
-def edit_inventory(item_id):
-    if current_user.user_type != 'agrovet':
-        flash('Access denied', 'error')
-        return redirect(url_for('index'))
+def view_post(post_id):
+    """View a single post with its answers"""
+    post = CommunityPost.query.get_or_404(post_id)
     
-    item = InventoryItem.query.get_or_404(item_id)
+    # Increment view count
+    post.views += 1
     
-    if item.agrovet_id != current_user.id:
-        flash('Access denied', 'error')
-        return redirect(url_for('agrovet_inventory'))
+    # Check if user is following this post
+    is_following = PostFollow.query.filter_by(
+        post_id=post_id, 
+        user_id=current_user.id
+    ).first() is not None
     
-    if request.method == 'POST':
-        item.product_name = request.form.get('product_name')
-        item.category = request.form.get('category')
-        item.description = request.form.get('description')
-        item.quantity = int(request.form.get('quantity', 0))
-        item.unit = request.form.get('unit')
-        item.price = float(request.form.get('price'))
-        item.cost_price = float(request.form.get('cost_price', 0))
-        item.reorder_level = int(request.form.get('reorder_level', 10))
-        item.supplier = request.form.get('supplier')
-        item.sku = request.form.get('sku')
-        
-        db.session.commit()
-        flash('Product updated successfully!', 'success')
-        return redirect(url_for('agrovet_inventory'))
+    # Check if user has upvoted this post
+    has_upvoted = PostUpvote.query.filter_by(
+        post_id=post_id,
+        user_id=current_user.id
+    ).first() is not None
     
-    return render_template('agrovet/edit_inventory.html', item=item)
-
-@app.route('/agrovet/inventory/delete/<int:item_id>', methods=['POST'])
-@login_required
-def delete_inventory(item_id):
-    if current_user.user_type != 'agrovet':
-        return jsonify({'error': 'Access denied'}), 403
+    # Get answers with upvote status
+    answers = PostAnswer.query.filter_by(post_id=post_id).order_by(
+        desc(PostAnswer.is_accepted),
+        desc(PostAnswer.created_at)
+    ).all()
     
-    item = InventoryItem.query.get_or_404(item_id)
+    # Check upvotes for each answer
+    answer_upvotes = {}
+    for answer in answers:
+        answer_upvotes[answer.id] = AnswerUpvote.query.filter_by(
+            answer_id=answer.id,
+            user_id=current_user.id
+        ).first() is not None
     
-    if item.agrovet_id != current_user.id:
-        return jsonify({'error': 'Access denied'}), 403
-    
-    db.session.delete(item)
     db.session.commit()
     
-    return jsonify({'success': True})
+    return render_template('community/view_post.html', 
+                         post=post, 
+                         answers=answers,
+                         is_following=is_following,
+                         has_upvoted=has_upvoted,
+                         answer_upvotes=answer_upvotes)
 
-@app.route('/agrovet/pos')
+@app.route('/community/post/<int:post_id>/answer', methods=['POST'])
 @login_required
-def agrovet_pos():
-    if current_user.user_type != 'agrovet':
-        flash('Access denied', 'error')
-        return redirect(url_for('index'))
+def post_answer(post_id):
+    """Post an answer to a question"""
+    post = CommunityPost.query.get_or_404(post_id)
     
-    items = InventoryItem.query.filter_by(agrovet_id=current_user.id).filter(InventoryItem.quantity > 0).all()
-    customers = Customer.query.filter_by(agrovet_id=current_user.id).all()
-    return render_template('agrovet/pos.html', items=items, customers=customers)
-
-@app.route('/agrovet/pos/checkout', methods=['POST'])
-@login_required
-def pos_checkout():
-    if current_user.user_type != 'agrovet':
-        return jsonify({'error': 'Access denied'}), 403
+    content = request.form.get('content', '').strip()
+    if not content:
+        flash('Answer content cannot be empty', 'error')
+        return redirect(url_for('view_post', post_id=post_id))
     
-    data = request.get_json()
-    cart_items = data.get('items', [])
-    customer_id = data.get('customer_id')
-    payment_method = data.get('payment_method', 'cash')
-    
-    if not cart_items:
-        return jsonify({'error': 'Cart is empty'}), 400
-    
-    total_amount = 0
-    receipt_number = f"RCP{current_user.id}{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-    
-    sale = Sale(
-        agrovet_id=current_user.id,
-        customer_id=customer_id if customer_id else None,
-        total_amount=0,
-        payment_method=payment_method,
-        receipt_number=receipt_number
+    answer = PostAnswer(
+        post_id=post_id,
+        user_id=current_user.id,
+        content=content
     )
-    db.session.add(sale)
-    db.session.flush()
     
-    for cart_item in cart_items:
-        item = InventoryItem.query.get(cart_item['id'])
-        if not item or item.agrovet_id != current_user.id:
-            continue
-        
-        quantity = cart_item['quantity']
-        if item.quantity < quantity:
-            return jsonify({'error': f'Insufficient stock for {item.product_name}'}), 400
-        
-        subtotal = item.price * quantity
-        total_amount += subtotal
-        
-        sale_item = SaleItem(
-            sale_id=sale.id,
-            product_name=item.product_name,
-            quantity=quantity,
-            unit_price=item.price,
-            subtotal=subtotal
+    db.session.add(answer)
+    
+    # Create notifications for post followers (excluding the answer author)
+    followers = PostFollow.query.filter_by(post_id=post_id).all()
+    for follow in followers:
+        if follow.user_id != current_user.id:
+            create_notification(
+                user_id=follow.user_id,
+                title='New Answer on Post You Follow',
+                message=f'{current_user.full_name} answered: "{post.title}"',
+                notification_type='info',
+                related_id=post_id
+            )
+    
+    # Notify the post owner if they're not the one answering
+    if post.user_id != current_user.id:
+        create_notification(
+            user_id=post.user_id,
+            title='New Answer on Your Post',
+            message=f'{current_user.full_name} answered your post: "{post.title}"',
+            notification_type='info',
+            related_id=post_id
         )
-        db.session.add(sale_item)
+    
+    # Update post timestamp
+    post.updated_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    flash('Your answer has been posted!', 'success')
+    return redirect(url_for('view_post', post_id=post_id))
+
+@app.route('/community/post/<int:post_id>/follow', methods=['POST'])
+@login_required
+def follow_post(post_id):
+    """Follow or unfollow a post"""
+    post = CommunityPost.query.get_or_404(post_id)
+    
+    existing_follow = PostFollow.query.filter_by(
+        post_id=post_id,
+        user_id=current_user.id
+    ).first()
+    
+    if existing_follow:
+        # Unfollow
+        db.session.delete(existing_follow)
+        action = 'unfollowed'
+    else:
+        # Follow
+        follow = PostFollow(post_id=post_id, user_id=current_user.id)
+        db.session.add(follow)
         
-        item.quantity -= quantity
-    
-    sale.total_amount = total_amount
-    
-    if customer_id:
-        customer = Customer.query.get(customer_id)
-        if customer:
-            customer.total_purchases += total_amount
-            customer.last_purchase = datetime.utcnow()
+        # Notify post owner
+        if post.user_id != current_user.id:
+            create_notification(
+                user_id=post.user_id,
+                title='New Follower on Your Post',
+                message=f'{current_user.full_name} started following your post: "{post.title}"',
+                notification_type='info',
+                related_id=post_id
+            )
+        action = 'followed'
     
     db.session.commit()
     
     return jsonify({
         'success': True,
-        'receipt_number': receipt_number,
-        'total_amount': total_amount,
-        'sale_id': sale.id
+        'action': action,
+        'followers_count': PostFollow.query.filter_by(post_id=post_id).count()
     })
 
-@app.route('/agrovet/crm')
+@app.route('/community/post/<int:post_id>/upvote', methods=['POST'])
 @login_required
-def agrovet_crm():
-    if current_user.user_type != 'agrovet':
-        flash('Access denied', 'error')
-        return redirect(url_for('index'))
+def upvote_post(post_id):
+    """Upvote or remove upvote from a post"""
+    post = CommunityPost.query.get_or_404(post_id)
     
-    customers = Customer.query.filter_by(agrovet_id=current_user.id).order_by(Customer.created_at.desc()).all()
-    return render_template('agrovet/crm.html', customers=customers)
-
-@app.route('/agrovet/crm/add', methods=['GET', 'POST'])
-@login_required
-def add_customer():
-    if current_user.user_type != 'agrovet':
-        flash('Access denied', 'error')
-        return redirect(url_for('index'))
+    existing_upvote = PostUpvote.query.filter_by(
+        post_id=post_id,
+        user_id=current_user.id
+    ).first()
     
-    if request.method == 'POST':
-        customer = Customer(
-            agrovet_id=current_user.id,
-            name=request.form.get('name'),
-            email=request.form.get('email'),
-            phone=request.form.get('phone'),
-            address=request.form.get('address'),
-            customer_type=request.form.get('customer_type'),
-            notes=request.form.get('notes')
-        )
+    if existing_upvote:
+        # Remove upvote
+        db.session.delete(existing_upvote)
+        action = 'removed'
+    else:
+        # Add upvote
+        upvote = PostUpvote(post_id=post_id, user_id=current_user.id)
+        db.session.add(upvote)
         
-        db.session.add(customer)
-        db.session.commit()
-        
-        flash('Customer added successfully!', 'success')
-        return redirect(url_for('agrovet_crm'))
+        # Notify post owner (if not the upvoter)
+        if post.user_id != current_user.id:
+            create_notification(
+                user_id=post.user_id,
+                title='Post Upvoted',
+                message=f'{current_user.full_name} upvoted your post: "{post.title}"',
+                notification_type='info',
+                related_id=post_id
+            )
+        action = 'added'
     
-    return render_template('agrovet/add_customer.html')
-
-@app.route('/agrovet/crm/view/<int:customer_id>')
-@login_required
-def view_customer(customer_id):
-    if current_user.user_type != 'agrovet':
-        flash('Access denied', 'error')
-        return redirect(url_for('index'))
-    
-    customer = Customer.query.get_or_404(customer_id)
-    
-    if customer.agrovet_id != current_user.id:
-        flash('Access denied', 'error')
-        return redirect(url_for('agrovet_crm'))
-    
-    communications = Communication.query.filter_by(customer_id=customer_id).order_by(Communication.date.desc()).all()
-    purchases = Sale.query.filter_by(customer_id=customer_id).order_by(Sale.sale_date.desc()).all()
-    
-    return render_template('agrovet/view_customer.html', customer=customer, communications=communications, purchases=purchases)
-
-@app.route('/agrovet/crm/communication/<int:customer_id>', methods=['POST'])
-@login_required
-def add_communication(customer_id):
-    if current_user.user_type != 'agrovet':
-        return jsonify({'error': 'Access denied'}), 403
-    
-    customer = Customer.query.get_or_404(customer_id)
-    
-    if customer.agrovet_id != current_user.id:
-        return jsonify({'error': 'Access denied'}), 403
-    
-    communication = Communication(
-        customer_id=customer_id,
-        communication_type=request.form.get('communication_type'),
-        subject=request.form.get('subject'),
-        message=request.form.get('message'),
-        follow_up_date=datetime.strptime(request.form.get('follow_up_date'), '%Y-%m-%d') if request.form.get('follow_up_date') else None
-    )
-    
-    db.session.add(communication)
     db.session.commit()
     
-    flash('Communication log added successfully!', 'success')
-    return redirect(url_for('view_customer', customer_id=customer_id))
+    return jsonify({
+        'success': True,
+        'action': action,
+        'upvotes_count': PostUpvote.query.filter_by(post_id=post_id).count()
+    })
 
-@app.route('/officer/dashboard')
+@app.route('/community/answer/<int:answer_id>/upvote', methods=['POST'])
 @login_required
-def officer_dashboard():
-    if current_user.user_type != 'extension_officer':
-        flash('Access denied', 'error')
-        return redirect(url_for('index'))
+def upvote_answer(answer_id):
+    """Upvote or remove upvote from an answer"""
+    answer = PostAnswer.query.get_or_404(answer_id)
     
-    all_disease_reports = DiseaseReport.query.order_by(DiseaseReport.created_at.desc()).limit(50).all()
-    farmers = User.query.filter_by(user_type='farmer').all()
+    existing_upvote = AnswerUpvote.query.filter_by(
+        answer_id=answer_id,
+        user_id=current_user.id
+    ).first()
     
-    return render_template('officer/dashboard.html', disease_reports=all_disease_reports, farmers=farmers)
+    if existing_upvote:
+        # Remove upvote
+        db.session.delete(existing_upvote)
+        action = 'removed'
+    else:
+        # Add upvote
+        upvote = AnswerUpvote(answer_id=answer_id, user_id=current_user.id)
+        db.session.add(upvote)
+        
+        # Notify answer author (if not the upvoter)
+        if answer.user_id != current_user.id:
+            create_notification(
+                user_id=answer.user_id,
+                title='Answer Upvoted',
+                message=f'{current_user.full_name} upvoted your answer',
+                notification_type='info',
+                related_id=answer.post_id
+            )
+        action = 'added'
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'action': action,
+        'upvotes_count': AnswerUpvote.query.filter_by(answer_id=answer_id).count()
+    })
 
-@app.route('/institution/dashboard')
+@app.route('/community/post/<int:post_id>/mark-resolved', methods=['POST'])
 @login_required
-def institution_dashboard():
-    if current_user.user_type != 'learning_institution':
-        flash('Access denied', 'error')
-        return redirect(url_for('index'))
+def mark_post_resolved(post_id):
+    """Mark a post as resolved (only post owner can do this)"""
+    post = CommunityPost.query.get_or_404(post_id)
     
-    return render_template('institution/dashboard.html')
+    if post.user_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Not authorized'}), 403
+    
+    post.is_resolved = not post.is_resolved
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'is_resolved': post.is_resolved
+    })
 
-@app.route('/api/chat', methods=['POST'])
+@app.route('/community/answer/<int:answer_id>/accept', methods=['POST'])
 @login_required
-def chat():
-    data = request.get_json()
-    message = data.get('message', '')
+def accept_answer(answer_id):
+    """Accept an answer as the solution (only post owner can do this)"""
+    answer = PostAnswer.query.get_or_404(answer_id)
+    post = answer.post
     
-    if not message:
-        return jsonify({'success': False, 'error': 'No message provided'})
+    if post.user_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Not authorized'}), 403
     
-    try:
-        headers = {
-            'Authorization': f'Bearer {cohere_api_key}',
-            'Content-Type': 'application/json',
-        }
-        
-        chat_payload = {
-            'model': 'c4ai-aya-expanse-8b',
-            'message': message,
-            'temperature': 0.7,
-            'max_tokens': 500,
-            'preamble': 'You are a helpful agricultural assistant specializing in farming, crops, livestock, and agricultural practices. Provide practical, concise advice to farmers.'
-        }
-        
-        response = requests.post('https://api.cohere.ai/v1/chat', json=chat_payload, headers=headers)
-        result = response.json()
-        
-        if response.status_code == 200 and 'text' in result:
-            ai_response = result['text']
-        else:
-            error_msg = result.get('message', 'Unknown error from Cohere API')
-            return jsonify({
-                'success': False,
-                'error': f'Cohere API error: {error_msg}'
-            })
-        
-        return jsonify({
-            'success': True,
-            'response': ai_response
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'Chat service error: {str(e)}'
-        })
+    # Unaccept any previously accepted answer
+    PostAnswer.query.filter_by(post_id=post.id, is_accepted=True).update({'is_accepted': False})
+    
+    # Accept this answer
+    answer.is_accepted = True
+    post.is_resolved = True
+    
+    # Notify answer author
+    if answer.user_id != current_user.id:
+        create_notification(
+            user_id=answer.user_id,
+            title='Answer Accepted',
+            message=f'Your answer was accepted as the solution for: "{post.title}"',
+            notification_type='success',
+            related_id=post.id
+        )
+    
+    # Notify all followers
+    followers = PostFollow.query.filter_by(post_id=post.id).all()
+    for follow in followers:
+        if follow.user_id != current_user.id and follow.user_id != answer.user_id:
+            create_notification(
+                user_id=follow.user_id,
+                title='Post Resolved',
+                message=f'Post you were following has been resolved: "{post.title}"',
+                notification_type='info',
+                related_id=post.id
+            )
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'is_accepted': answer.is_accepted
+    })
 
-@app.route('/test-api')
-def test_api():
-    try:
-        headers = {
-            'Authorization': f'Bearer {cohere_api_key}',
-            'Content-Type': 'application/json',
-        }
-        
-        test_payload = {
-            'model': 'c4ai-aya-expanse-8b',
-            'message': 'Please respond with "API test successful" if you are working.',
-            'temperature': 0.7,
-            'max_tokens': 20
-        }
-        
-        response = requests.post('https://api.cohere.ai/v1/chat', json=test_payload, headers=headers)
-        result = response.json()
-        
-        if response.status_code == 200 and 'text' in result:
-            test_response = result['text']
-            return f"Cohere API is working! Response: {test_response}"
-        else:
-            error_msg = result.get('message', 'Unknown error')
-            return f"Cohere API error: {response.status_code} - {error_msg}"
-            
-    except Exception as e:
-        return f"Cohere API Error: {str(e)}"
+@app.route('/community/my-posts')
+@login_required
+def my_posts():
+    """View user's own posts"""
+    page = request.args.get('page', 1, type=int)
+    
+    posts = CommunityPost.query.filter_by(user_id=current_user.id).order_by(
+        desc(CommunityPost.created_at)
+    ).paginate(page=page, per_page=10, error_out=False)
+    
+    return render_template('community/my_posts.html', posts=posts)
 
-@app.route('/list-models')
-def list_models():
-    try:
-        headers = {
-            'Authorization': f'Bearer {cohere_api_key}',
-            'Content-Type': 'application/json',
-        }
-        
-        response = requests.get('https://api.cohere.ai/v1/models', headers=headers)
-        result = response.json()
-        
-        if response.status_code == 200:
-            models = result.get('models', [])
-            model_list = "\n".join([f"- {model['name']}" for model in models])
-            return f"Available Cohere models:\n{model_list}"
-        else:
-            return f"Error fetching models: {response.status_code} - {result}"
-            
-    except Exception as e:
-        return f"Error: {str(e)}"
+@app.route('/community/followed-posts')
+@login_required
+def followed_posts():
+    """View posts that user is following"""
+    page = request.args.get('page', 1, type=int)
+    
+    # Get posts that user is following
+    posts = CommunityPost.query.join(PostFollow).filter(
+        PostFollow.user_id == current_user.id
+    ).order_by(desc(CommunityPost.updated_at)).paginate(
+        page=page, per_page=10, error_out=False
+    )
+    
+    return render_template('community/followed_posts.html', posts=posts)
 
-@app.route('/favicon.ico')
-def favicon():
-    return '', 404
+@app.route('/community/notifications')
+@login_required
+def community_notifications():
+    """View user's notifications"""
+    notifications = Notification.query.filter_by(
+        user_id=current_user.id
+    ).order_by(desc(Notification.created_at)).limit(50).all()
+    
+    # Mark all as read
+    Notification.query.filter_by(user_id=current_user.id, is_read=False).update({'is_read': True})
+    db.session.commit()
+    
+    return render_template('community/notifications.html', notifications=notifications)
+
+@app.route('/community/leaderboard')
+@login_required
+def leaderboard():
+    """Community leaderboard based on contributions"""
+    # Top answerers (users with most accepted answers)
+    top_answerers = db.session.query(
+        User.id,
+        User.full_name,
+        User.profile_picture,
+        func.count(PostAnswer.id).label('answer_count'),
+        func.sum(func.case((PostAnswer.is_accepted == True, 1), else_=0)).label('accepted_count')
+    ).join(PostAnswer, User.id == PostAnswer.user_id).group_by(User.id).order_by(
+        desc('accepted_count'),
+        desc('answer_count')
+    ).limit(10).all()
+    
+    # Most helpful posts (posts with most upvotes)
+    helpful_posts = db.session.query(
+        CommunityPost.id,
+        CommunityPost.title,
+        User.full_name,
+        func.count(PostUpvote.id).label('upvote_count')
+    ).join(User).outerjoin(PostUpvote).group_by(CommunityPost.id, User.full_name).order_by(
+        desc('upvote_count')
+    ).limit(10).all()
+    
+    return render_template('community/leaderboard.html',
+                         top_answerers=top_answerers,
+                         helpful_posts=helpful_posts)
+
+@app.route('/profile')
+@login_required
+def view_profile():
+    """View user profile"""
+    # Get user's community stats
+    posts_count = CommunityPost.query.filter_by(user_id=current_user.id).count()
+    answers_count = PostAnswer.query.filter_by(user_id=current_user.id).count()
+    accepted_answers = PostAnswer.query.filter_by(user_id=current_user.id, is_accepted=True).count()
+    
+    return render_template('profile.html',
+                         posts_count=posts_count,
+                         answers_count=answers_count,
+                         accepted_answers=accepted_answers)
+
+@app.route('/profile/edit', methods=['GET', 'POST'])
+@login_required
+def edit_profile():
+    """Edit user profile"""
+    if request.method == 'POST':
+        current_user.full_name = request.form.get('full_name')
+        current_user.phone_number = request.form.get('phone_number')
+        current_user.location = request.form.get('location')
+        
+        # Handle profile picture update
+        if 'profile_picture' in request.files:
+            file = request.files['profile_picture']
+            if file and file.filename != '' and allowed_file(file.filename):
+                # Remove old profile picture if exists
+                if current_user.profile_picture:
+                    old_path = os.path.join(app.config['UPLOAD_FOLDER'], current_user.profile_picture)
+                    if os.path.exists(old_path):
+                        os.remove(old_path)
+                
+                # Save new profile picture
+                filename = secure_filename(f"{current_user.email}_{file.filename}")
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
+                current_user.profile_picture = filename
+        
+        db.session.commit()
+        flash('Profile updated successfully!', 'success')
+        return redirect(url_for('view_profile'))
+    
+    return render_template('edit_profile.html')
+
+# ... [Keep all your other existing routes] ...
 
 @app.route('/notifications/mark-read/<int:notification_id>', methods=['POST'])
 @login_required
@@ -633,6 +644,11 @@ def format_datetime(value):
     if value is None:
         return ""
     return value.strftime('%Y-%m-%d %H:%M')
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    """Serve uploaded files"""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
