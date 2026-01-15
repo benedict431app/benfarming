@@ -1,0 +1,149 @@
+{% extends "components/base.html" %}
+
+{% block title %}{{ agrovet.full_name }} - Products{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <!-- Agrovet Header -->
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-4">
+                    {% if agrovet.profile_picture %}
+                    <img src="{{ url_for('static', filename='uploads/' + agrovet.profile_picture) }}" 
+                         class="rounded-circle me-4" width="80" height="80" alt="{{ agrovet.full_name }}">
+                    {% else %}
+                    <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-4" 
+                         style="width: 80px; height: 80px;">
+                        <span class="text-white h3">{{ agrovet.full_name[0] }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="flex-grow-1">
+                        <h2 class="mb-1">{{ agrovet.full_name }}</h2>
+                        <p class="text-muted mb-2">
+                            <i class="fas fa-map-marker-alt"></i> {{ agrovet.location or 'Not specified' }}
+                            {% if agrovet.phone_number %}
+                            • <i class="fas fa-phone"></i> {{ agrovet.phone_number }}
+                            {% endif %}
+                        </p>
+                        <div class="btn-group">
+                            <a href="{{ url_for('chat_with_user', user_id=agrovet.id) }}" 
+                               class="btn btn-success">
+                                <i class="fas fa-envelope"></i> Message
+                            </a>
+                            <a href="tel:{{ agrovet.phone_number }}" class="btn btn-outline-success" 
+                               {% if not agrovet.phone_number %}disabled{% endif %}>
+                                <i class="fas fa-phone"></i> Call
+                            </a>
+                            {% if current_user.user_type == 'farmer' %}
+                            <button class="btn btn-outline-primary" 
+                                    onclick="addAllToCart({{ agrovet.id }})">
+                                <i class="fas fa-cart-plus"></i> Add All to Cart
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Products Grid -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3>Available Products</h3>
+            <span class="badge bg-success">{{ products|length }} products</span>
+        </div>
+        
+        {% if products %}
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for product in products %}
+            <div class="col">
+                <div class="card shadow h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <h5 class="card-title mb-1">{{ product.product_name }}</h5>
+                                <small class="text-muted">{{ product.category or 'General' }}</small>
+                            </div>
+                            <span class="badge bg-{% if product.quantity > 0 %}success{% else %}danger{% endif %}">
+                                {% if product.quantity > 0 %}{{ product.quantity }} in stock{% else %}Out of stock{% endif %}
+                            </span>
+                        </div>
+                        
+                        <p class="card-text text-muted small mb-3">
+                            {{ product.description|truncate(100) if product.description else 'No description' }}
+                        </p>
+                        
+                        <div class="mb-3">
+                            <h4 class="text-success mb-0">KES {{ "%.2f"|format(product.price) }}</h4>
+                            {% if product.unit %}
+                            <small class="text-muted">per {{ product.unit }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            {% if current_user.user_type == 'farmer' %}
+                            <button class="btn btn-success" 
+                                    onclick="addToCart({{ product.id }})"
+                                    {% if product.quantity == 0 %}disabled{% endif %}>
+                                <i class="fas fa-cart-plus"></i> Add to Cart
+                            </button>
+                            {% endif %}
+                            <a href="{{ url_for('message_about_product', product_id=product.id) }}" 
+                               class="btn btn-outline-primary">
+                                <i class="fas fa-question-circle"></i> Inquire
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent border-top">
+                        <small class="text-muted">
+                            <i class="fas fa-tag"></i> SKU: {{ product.sku or 'N/A' }}
+                            {% if product.supplier %}
+                            • <i class="fas fa-truck"></i> {{ product.supplier }}
+                            {% endif %}
+                        </small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+            <h3>No products available</h3>
+            <p class="text-muted">This agrovet has no products listed yet.</p>
+            {% if current_user.id == agrovet.id %}
+            <a href="{{ url_for('add_inventory') }}" class="btn btn-success">
+                <i class="fas fa-plus"></i> Add Products
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function addToCart(productId) {
+    fetch("{{ url_for('add_to_cart') }}/" + productId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'quantity=1'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Product added to cart!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        }
+    });
+}
+
+function addAllToCart(agrovetId) {
+    if (confirm('Add all available products from this agrovet to cart?')) {
+        // This would require a new endpoint to handle bulk add
+        showToast('This feature is coming soon!', 'info');
+    }
+}
+</script>
+{% endblock %}
