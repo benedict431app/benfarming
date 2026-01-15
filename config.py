@@ -1,6 +1,5 @@
 import os
 from dotenv import load_dotenv
-from datetime import timedelta
 
 load_dotenv()
 
@@ -8,16 +7,15 @@ class Config:
     # Security
     SECRET_KEY = os.getenv('SECRET_KEY', os.getenv('SESSION_SECRET', 'dev-secret-key-change-in-production'))
     
-    # Database - Use SQLite (works on Render with file system)
-    # On Render, the file system is ephemeral, but SQLite will work
-    # For persistence, consider mounting a volume or using Render's disk
+    # Database - Use PostgreSQL on Render, SQLite locally
     if os.environ.get('RENDER'):
-        # On Render, use a persistent location
-        SQLALCHEMY_DATABASE_URI = 'sqlite:////tmp/agriconnect.db'  # /tmp is writable on Render
+        DATABASE_URL = os.environ.get('DATABASE_URL')
+        if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
+            DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
     else:
-        # Local development
-        SQLALCHEMY_DATABASE_URI = 'sqlite:///agriconnect.db'
+        DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///database.db')
     
+    SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # File uploads
@@ -38,24 +36,11 @@ class Config:
     WEGLOT_API_KEY = os.getenv('WEGLOT_API_KEY')
     COHERE_API_KEY = os.getenv('COHERE_API_KEY')
     
+    # Email configuration
+    SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+    SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
+    SMTP_USERNAME = os.getenv('SMTP_USERNAME')
+    SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
+    
     # Flask configuration
     PREFERRED_URL_SCHEME = 'https' if os.environ.get('RENDER') else 'http'
-    
-    # Session configuration
-    SESSION_COOKIE_SECURE = True if os.environ.get('RENDER') else False
-    SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = 'Lax'
-    REMEMBER_COOKIE_DURATION = timedelta(days=7)
-    REMEMBER_COOKIE_SECURE = True if os.environ.get('RENDER') else False
-    REMEMBER_COOKIE_HTTPONLY = True
-    
-    # M-Pesa settings (for Kenya)
-    MPESA_CONSUMER_KEY = os.getenv('MPESA_CONSUMER_KEY', '')
-    MPESA_CONSUMER_SECRET = os.getenv('MPESA_CONSUMER_SECRET', '')
-    MPESA_SHORTCODE = os.getenv('MPESA_SHORTCODE', '')
-    MPESA_PASSKEY = os.getenv('MPESA_PASSKEY', '')
-    
-    # Site settings
-    SITE_NAME = 'AgriConnect'
-    SITE_DESCRIPTION = 'Connecting Farmers and Agrovets'
-    ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@agriconnect.com')
