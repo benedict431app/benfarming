@@ -1,145 +1,53 @@
-{% extends "components/base.html" %}
-
-{% block title %}Welcome to Adiseware{% endblock %}
+my templates index.html is {% extends "components/base.html" %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-10">
-        <!-- Hero Section -->
-        <div class="text-center py-5">
-            <h1 class="display-4 mb-4 text-success">
-                <i class="fas fa-leaf"></i> Welcome to Adiseware
-            </h1>
-            <p class="lead mb-4">
-                Your comprehensive agricultural management system connecting farmers, 
-                agrovets, extension officers, and learning institutions.
-            </p>
-            
-            {% if not current_user.is_authenticated %}
-            <div class="d-grid gap-3 d-md-flex justify-content-md-center mt-5">
-                <a href="{{ url_for('login') }}" class="btn btn-success btn-lg px-5">
-                    <i class="fas fa-sign-in-alt"></i> Login
-                </a>
-                <a href="{{ url_for('register') }}" class="btn btn-outline-success btn-lg px-5">
-                    <i class="fas fa-user-plus"></i> Register
-                </a>
-            </div>
-            {% else %}
-            <div class="mt-5">
-                <a href="{% if current_user.user_type == 'farmer' %}{{ url_for('farmer_dashboard') }}
-                         {% elif current_user.user_type == 'agrovet' %}{{ url_for('agrovet_dashboard') }}
-                         {% elif current_user.user_type == 'extension_officer' %}{{ url_for('officer_dashboard') }}
-                         {% elif current_user.user_type == 'learning_institution' %}{{ url_for('institution_dashboard') }}
-                         {% elif current_user.user_type == 'admin' %}{{ url_for('admin_dashboard') }}
-                         {% else %}{{ url_for('index') }}{% endif %}" 
-                   class="btn btn-success btn-lg px-5">
-                    <i class="fas fa-tachometer-alt"></i> Go to Dashboard
-                </a>
-            </div>
-            {% endif %}
-        </div>
+<div class="hero-section text-center py-5 bg-light">
+    <h1 class="display-4">Welcome to Adiseware</h1>
+    <p class="lead">Empowering Agriculture Through Technology</p>
+    <div class="mt-4">
+        <a href="{{ url_for('register') }}" class="btn btn-success btn-lg me-2" aria-label="Get started by registering">Get Started</a>
+        <a href="{{ url_for('login') }}" class="btn btn-outline-success btn-lg" aria-label="Login to your account">Login</a>
+    </div>
+</div>
 
-        <!-- Features Section -->
-        <div class="row mt-5">
-            <div class="col-md-4 mb-4">
-                <div class="card h-100 shadow">
-                    <div class="card-body text-center">
-                        <div class="display-1 text-success mb-3">
-                            <i class="fas fa-user-farmer"></i>
-                        </div>
-                        <h3>For Farmers</h3>
-                        <p class="text-muted">
-                            Disease detection, weather updates, product shopping, 
-                            community support, and expert advice.
-                        </p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-4 mb-4">
-                <div class="card h-100 shadow">
-                    <div class="card-body text-center">
-                        <div class="display-1 text-success mb-3">
-                            <i class="fas fa-store"></i>
-                        </div>
-                        <h3>For Agrovets</h3>
-                        <p class="text-muted">
-                            Inventory management, POS system, CRM, sales tracking, 
-                            and customer management.
-                        </p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-4 mb-4">
-                <div class="card h-100 shadow">
-                    <div class="card-body text-center">
-                        <div class="display-1 text-success mb-3">
-                            <i class="fas fa-graduation-cap"></i>
-                        </div>
-                        <h3>For Institutions</h3>
-                        <p class="text-muted">
-                            Access to agricultural data, research materials, 
-                            and collaborative learning opportunities.
-                        </p>
-                    </div>
+<div class="container my-5">
+    <div class="row">
+        <div class="col-md-3 text-center mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <i class="fas fa-user-tie fa-3x text-success mb-3" aria-hidden="true"></i>
+                    <h3 class="h5 card-title">Farmers</h3>
+                    <p class="card-text">Detect plant diseases, get weather recommendations, and find nearby agrovets.</p>
                 </div>
             </div>
         </div>
-
-        <!-- How it Works -->
-        <div class="card shadow mt-5">
-            <div class="card-header bg-success text-white">
-                <h4 class="mb-0">How Adiseware Works</h4>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3 text-center">
-                        <div class="rounded-circle bg-success d-inline-flex align-items-center justify-content-center mb-3" 
-                             style="width: 80px; height: 80px;">
-                            <span class="text-white h4">1</span>
-                        </div>
-                        <h5>Register</h5>
-                        <p>Create your account based on your role</p>
-                    </div>
-                    <div class="col-md-3 text-center">
-                        <div class="rounded-circle bg-success d-inline-flex align-items-center justify-content-center mb-3" 
-                             style="width: 80px; height: 80px;">
-                            <span class="text-white h4">2</span>
-                        </div>
-                        <h5>Connect</h5>
-                        <p>Join the agricultural community</p>
-                    </div>
-                    <div class="col-md-3 text-center">
-                        <div class="rounded-circle bg-success d-inline-flex align-items-center justify-content-center mb-3" 
-                             style="width: 80px; height: 80px;">
-                            <span class="text-white h4">3</span>
-                        </div>
-                        <h5>Collaborate</h5>
-                        <p>Share knowledge and resources</p>
-                    </div>
-                    <div class="col-md-3 text-center">
-                        <div class="rounded-circle bg-success d-inline-flex align-items-center justify-content-center mb-3" 
-                             style="width: 80px; height: 80px;">
-                            <span class="text-white h4">4</span>
-                        </div>
-                        <h5>Grow</h5>
-                        <p>Improve your agricultural practices</p>
-                    </div>
+        <div class="col-md-3 text-center mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <i class="fas fa-store fa-3x text-success mb-3" aria-hidden="true"></i>
+                    <h3 class="h5 card-title">Agrovets</h3>
+                    <p class="card-text">Manage inventory, run POS system, and maintain customer relationships.</p>
                 </div>
             </div>
         </div>
-
-        <!-- Call to Action -->
-        {% if not current_user.is_authenticated %}
-        <div class="text-center mt-5 py-5">
-            <h2 class="mb-4">Ready to join our agricultural community?</h2>
-            <a href="{{ url_for('register') }}" class="btn btn-success btn-lg px-5">
-                <i class="fas fa-user-plus"></i> Get Started Free
-            </a>
-            <p class="text-muted mt-3">No credit card required</p>
+        <div class="col-md-3 text-center mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <i class="fas fa-user-shield fa-3x text-success mb-3" aria-hidden="true"></i>
+                    <h3 class="h5 card-title">Extension Officers</h3>
+                    <p class="card-text">Monitor disease outbreaks and provide advisory services to farmers.</p>
+                </div>
+            </div>
         </div>
-        {% endif %}
+        <div class="col-md-3 text-center mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <i class="fas fa-graduation-cap fa-3x text-success mb-3" aria-hidden="true"></i>
+                    <h3 class="h5 card-title">Learning Institutions</h3>
+                    <p class="card-text">Access educational resources and agricultural research data.</p>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
