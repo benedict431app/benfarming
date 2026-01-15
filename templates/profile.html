@@ -1,0 +1,109 @@
+{% extends "components/base.html" %}
+
+{% block title %}My Profile - Adiseware{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card shadow mb-4">
+            <div class="card-body text-center">
+                {% if current_user.profile_picture %}
+                <img src="{{ url_for('static', filename='uploads/' + current_user.profile_picture) }}" 
+                     class="rounded-circle mb-3" width="150" height="150" alt="{{ current_user.full_name }}">
+                {% else %}
+                <div class="rounded-circle bg-secondary d-inline-flex align-items-center justify-content-center mb-3" 
+                     style="width: 150px; height: 150px;">
+                    <span class="text-white display-4">{{ current_user.full_name[0] }}</span>
+                </div>
+                {% endif %}
+                
+                <h3>{{ current_user.full_name }}</h3>
+                <p class="text-muted">{{ current_user.user_type|replace('_', ' ')|title }}</p>
+                <p><i class="fas fa-map-marker-alt"></i> {{ current_user.location or 'Not specified' }}</p>
+                <p><i class="fas fa-phone"></i> {{ current_user.phone_number or 'Not specified' }}</p>
+                <p><i class="fas fa-envelope"></i> {{ current_user.email }}</p>
+                
+                <a href="{{ url_for('edit_profile') }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-edit"></i> Edit Profile
+                </a>
+            </div>
+        </div>
+        
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="mb-0">Change Password</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('change_password') }}">
+                    <div class="mb-3">
+                        <label for="current_password" class="form-label">Current Password</label>
+                        <input type="password" class="form-control" id="current_password" name="current_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">New Password</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirm New Password</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                    <button type="submit" class="btn btn-success">Change Password</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card shadow mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">My Reviews</h5>
+                <span class="badge bg-success">{{ reviews|length }} reviews</span>
+            </div>
+            <div class="card-body">
+                {% if reviews %}
+                {% for review in reviews %}
+                <div class="border-bottom pb-3 mb-3">
+                    <div class="d-flex justify-content-between">
+                        <strong>{{ review.reviewer.full_name }}</strong>
+                        <div>
+                            {% for i in range(5) %}
+                            {% if i < review.rating %}
+                            <i class="fas fa-star text-warning"></i>
+                            {% else %}
+                            <i class="far fa-star text-warning"></i>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <p class="text-muted mb-1">{{ review.user_type|replace('_', ' ')|title }}</p>
+                    <p>{{ review.review_text }}</p>
+                    <small class="text-muted">{{ review.created_at.strftime('%Y-%m-%d') }}</small>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted">No reviews yet.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Activity</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_posts %}
+                {% for post in recent_posts %}
+                <div class="border-bottom pb-2 mb-2">
+                    <h6><a href="{{ url_for('view_post', post_id=post.id) }}">{{ post.title }}</a></h6>
+                    <p class="text-muted mb-1">{{ post.content[:100] }}...</p>
+                    <small class="text-muted">{{ post.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted">No recent posts.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
