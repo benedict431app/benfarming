@@ -1,0 +1,131 @@
+{% extends "components/base.html" %}
+
+{% block title %}Browse Agrovets - Adiseware{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Find Agrovets</h1>
+            <a href="{{ url_for('browse_products') }}" class="btn btn-outline-success">
+                <i class="fas fa-seedling"></i> Browse Products
+            </a>
+        </div>
+        
+        <!-- Search Form -->
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('browse_agrovets') }}" class="row g-3">
+                    <div class="col-md-8">
+                        <input type="text" class="form-control" name="location" 
+                               placeholder="Enter your location (city, town)" 
+                               value="{{ request.args.get('location', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="fas fa-search"></i> Find Agrovets
+                        </button>
+                    </div>
+                </form>
+                {% if location %}
+                <p class="mt-3 mb-0">Showing agrovets near: <strong>{{ location }}</strong></p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Agrovets Grid -->
+        {% if agrovets %}
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for agrovet in agrovets %}
+            <div class="col">
+                <div class="card shadow h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-start mb-3">
+                            {% if agrovet.profile_picture %}
+                            <img src="{{ url_for('static', filename='uploads/' + agrovet.profile_picture) }}" 
+                                 class="rounded-circle me-3" width="60" height="60" alt="{{ agrovet.full_name }}">
+                            {% else %}
+                            <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 60px; height: 60px;">
+                                <span class="text-white h5">{{ agrovet.full_name[0] }}</span>
+                            </div>
+                            {% endif %}
+                            <div>
+                                <h5 class="mb-1">{{ agrovet.full_name }}</h5>
+                                <p class="text-muted mb-1">
+                                    <i class="fas fa-map-marker-alt"></i> {{ agrovet.location or 'Not specified' }}
+                                </p>
+                                <div class="small">
+                                    {% set review_stats = namespace(total=0, count=0, avg=0) %}
+                                    {% for review in agrovet.reviews_received %}
+                                    {% if review.is_approved %}
+                                    {% set review_stats.total = review_stats.total + review.rating %}
+                                    {% set review_stats.count = review_stats.count + 1 %}
+                                    {% endif %}
+                                    {% endfor %}
+                                    {% if review_stats.count > 0 %}
+                                    {% set review_stats.avg = review_stats.total / review_stats.count %}
+                                    <span class="text-warning">
+                                        {% for i in range(5) %}
+                                        {% if i < review_stats.avg|int %}
+                                        <i class="fas fa-star"></i>
+                                        {% else %}
+                                        <i class="far fa-star"></i>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </span>
+                                    <small class="text-muted">({{ review_stats.count }} reviews)</small>
+                                    {% else %}
+                                    <span class="text-muted">No reviews yet</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% set product_count = agrovet.inventory_items|selectattr('quantity', 'gt', 0)|list|length %}
+                        <div class="mb-3">
+                            <small class="text-muted">
+                                <i class="fas fa-box"></i> {{ product_count }} products available
+                            </small>
+                        </div>
+                        
+                        {% if agrovet.phone_number %}
+                        <div class="mb-3">
+                            <small><i class="fas fa-phone"></i> {{ agrovet.phone_number }}</small>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('agrovet_products', agrovet_id=agrovet.id) }}" 
+                               class="btn btn-outline-success">
+                                <i class="fas fa-store"></i> View Products
+                            </a>
+                            <a href="{{ url_for('chat_with_user', user_id=agrovet.id) }}" 
+                               class="btn btn-success">
+                                <i class="fas fa-envelope"></i> Send Message
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-store-slash fa-3x text-muted mb-3"></i>
+            <h3>No agrovets found</h3>
+            <p class="text-muted mb-4">
+                {% if location %}
+                No agrovets found near "{{ location }}"
+                {% else %}
+                Try searching for a location
+                {% endif %}
+            </p>
+            <a href="{{ url_for('browse_agrovets') }}" class="btn btn-success">
+                <i class="fas fa-redo"></i> Search Again
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

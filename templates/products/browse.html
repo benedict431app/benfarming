@@ -1,0 +1,207 @@
+{% extends "components/base.html" %}
+
+{% block title %}Browse Products - Adiseware{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Browse Products</h1>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('browse_agrovets') }}" class="btn btn-outline-success">
+                    <i class="fas fa-store"></i> View Agrovets
+                </a>
+                <a href="{{ url_for('view_cart') }}" class="btn btn-success position-relative">
+                    <i class="fas fa-shopping-cart"></i> Cart
+                    {% set cart_count = current_user.cart_items|sum(attribute='quantity') %}
+                    {% if cart_count > 0 %}
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                        {{ cart_count }}
+                    </span>
+                    {% endif %}
+                </a>
+            </div>
+        </div>
+        
+        <!-- Search and Filter -->
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('browse_products') }}" class="row g-3">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" name="search" placeholder="Search products..." 
+                               value="{{ request.args.get('search', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" name="category">
+                            <option value="">All Categories</option>
+                            <option value="seeds">Seeds</option>
+                            <option value="fertilizer">Fertilizer</option>
+                            <option value="pesticide">Pesticide</option>
+                            <option value="equipment">Equipment</option>
+                            <option value="tools">Tools</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" name="location">
+                            <option value="">All Locations</option>
+                            <option value="Nairobi">Nairobi</option>
+                            <option value="Mombasa">Mombasa</option>
+                            <option value="Kisumu">Kisumu</option>
+                            <option value="Nakuru">Nakuru</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-success">Search</button>
+                        <a href="{{ url_for('browse_products') }}" class="btn btn-secondary">Clear</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Products by Price Comparison -->
+        {% if product_groups %}
+        {% for product_name, products in product_groups.items() %}
+        <div class="card shadow mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">{{ product_name }}</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Agrovet</th>
+                                <th>Location</th>
+                                <th>Price (KES)</th>
+                                <th>Stock</th>
+                                <th>Unit</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in products[:5] %} <!-- Show top 5 cheapest -->
+                            <tr {% if loop.first %}class="table-success"{% endif %}>
+                                <td>
+                                    <a href="{{ url_for('agrovet_products', agrovet_id=product.agrovet.id) }}" 
+                                       class="text-decoration-none">
+                                        {{ product.agrovet.full_name }}
+                                    </a>
+                                </td>
+                                <td>{{ product.agrovet.location or 'Not specified' }}</td>
+                                <td>
+                                    <strong>KES {{ "%.2f"|format(product.price) }}</strong>
+                                    {% if loop.first %}
+                                    <span class="badge bg-success ms-2">Cheapest</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if product.quantity > 0 %}
+                                    <span class="badge bg-success">{{ product.quantity }}</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Out of stock</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ product.unit or 'unit' }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('chat_with_user', user_id=product.agrovet.id) }}" 
+                                           class="btn btn-outline-success" title="Message">
+                                            <i class="fas fa-envelope"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-success" 
+                                                onclick="addToCart({{ product.id }})"
+                                                {% if product.quantity == 0 %}disabled{% endif %}>
+                                            <i class="fas fa-cart-plus"></i> Add
+                                        </button>
+                                        <a href="{{ url_for('message_about_product', product_id=product.id) }}" 
+                                           class="btn btn-outline-primary" title="Inquire">
+                                            <i class="fas fa-question-circle"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                {% if products|length > 5 %}
+                <div class="text-center mt-3">
+                    <button class="btn btn-sm btn-outline-secondary" type="button" 
+                            data-bs-toggle="collapse" data-bs-target="#morePrices{{ loop.index }}">
+                        Show {{ products|length - 5 }} more prices
+                    </button>
+                    
+                    <div class="collapse mt-3" id="morePrices{{ loop.index }}">
+                        <table class="table table-sm">
+                            <tbody>
+                                {% for product in products[5:] %}
+                                <tr>
+                                    <td>{{ product.agrovet.full_name }}</td>
+                                    <td>{{ product.agrovet.location }}</td>
+                                    <td>KES {{ "%.2f"|format(product.price) }}</td>
+                                    <td>
+                                        {% if product.quantity > 0 %}
+                                        <span class="badge bg-success">{{ product.quantity }}</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">Out of stock</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-success" 
+                                                onclick="addToCart({{ product.id }})"
+                                                {% if product.quantity == 0 %}disabled{% endif %}>
+                                            Add
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-seedling fa-3x text-muted mb-3"></i>
+            <h3>No products found</h3>
+            <p class="text-muted">Try adjusting your search criteria</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function addToCart(productId) {
+    fetch("{{ url_for('add_to_cart') }}/" + productId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'quantity=1'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show';
+            alertDiv.innerHTML = `
+                <strong>Success!</strong> Product added to cart.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.querySelector('main').prepend(alertDiv);
+            
+            // Update cart count
+            setTimeout(() => location.reload(), 1000);
+        }
+    })
+    .catch(error => {
+        alert('Error adding to cart: ' + error);
+    });
+}
+</script>
+{% endblock %}

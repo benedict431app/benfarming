@@ -1,0 +1,190 @@
+{% extends "components/base.html" %}
+
+{% block title %}Shopping Cart - Adiseware{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Shopping Cart</h1>
+            <a href="{{ url_for('browse_products') }}" class="btn btn-outline-success">
+                <i class="fas fa-arrow-left"></i> Continue Shopping
+            </a>
+        </div>
+        
+        {% if cart_items %}
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                {% set items_by_agrovet = {} %}
+                {% for item in cart_items %}
+                    {% set agrovet_id = item.product.agrovet.id %}
+                    {% if agrovet_id not in items_by_agrovet %}
+                        {% set _ = items_by_agrovet.update({agrovet_id: {'agrovet': item.product.agrovet, 'items': [], 'subtotal': 0}}) %}
+                    {% endif %}
+                    {% set item_total = item.product.price * item.quantity %}
+                    {% set _ = items_by_agrovet[agrovet_id]['items'].append(item) %}
+                    {% set _ = items_by_agrovet[agrovet_id].update({'subtotal': items_by_agrovet[agrovet_id]['subtotal'] + item_total}) %}
+                {% endfor %}
+                
+                {% for agrovet_id, agrovet_data in items_by_agrovet.items() %}
+                <div class="border-bottom pb-4 mb-4">
+                    <div class="d-flex align-items-center mb-3">
+                        {% if agrovet_data.agrovet.profile_picture %}
+                        <img src="{{ url_for('static', filename='uploads/' + agrovet_data.agrovet.profile_picture) }}" 
+                             class="rounded-circle me-3" width="50" height="50" alt="{{ agrovet_data.agrovet.full_name }}">
+                        {% else %}
+                        <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-3" 
+                             style="width: 50px; height: 50px;">
+                            <span class="text-white">{{ agrovet_data.agrovet.full_name[0] }}</span>
+                        </div>
+                        {% endif %}
+                        <div>
+                            <h5 class="mb-0">{{ agrovet_data.agrovet.full_name }}</h5>
+                            <small class="text-muted">{{ agrovet_data.agrovet.location or 'Not specified' }}</small>
+                        </div>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Price</th>
+                                    <th>Quantity</th>
+                                    <th>Total</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in agrovet_data.items %}
+                                <tr>
+                                    <td>
+                                        <div>
+                                            <strong>{{ item.product.product_name }}</strong>
+                                            <small class="text-muted d-block">{{ item.product.category or 'General' }}</small>
+                                        </div>
+                                    </td>
+                                    <td>KES {{ "%.2f"|format(item.product.price) }}</td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('update_cart_item', cart_item_id=item.id) }}" 
+                                              class="d-flex align-items-center">
+                                            <input type="number" name="quantity" value="{{ item.quantity }}" 
+                                                   min="1" max="{{ item.product.quantity }}" class="form-control form-control-sm" 
+                                                   style="width: 80px;" onchange="this.form.submit()">
+                                        </form>
+                                    </td>
+                                    <td>KES {{ "%.2f"|format(item.product.price * item.quantity) }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                onclick="removeFromCart({{ item.id }})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
+                                    <td><strong>KES {{ "%.2f"|format(agrovet_data.subtotal) }}</strong></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end">
+                        <a href="{{ url_for('chat_with_user', user_id=agrovet_data.agrovet.id) }}" 
+                           class="btn btn-outline-success me-2">
+                            <i class="fas fa-envelope"></i> Message Agrovet
+                        </a>
+                        <a href="{{ url_for('agrovet_products', agrovet_id=agrovet_data.agrovet.id) }}" 
+                           class="btn btn-outline-primary">
+                            <i class="fas fa-store"></i> View More Products
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
+            <h3>Your cart is empty</h3>
+            <p class="text-muted">Add some products to get started!</p>
+            <a href="{{ url_for('browse_products') }}" class="btn btn-success">
+                <i class="fas fa-seedling"></i> Browse Products
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    
+    {% if cart_items %}
+    <div class="col-md-4">
+        <div class="card shadow sticky-top" style="top: 20px;">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">Order Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Subtotal</span>
+                    <span>KES {{ "%.2f"|format(total) }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Delivery</span>
+                    <span>KES 0.00</span>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span>Tax</span>
+                    <span>KES 0.00</span>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between mb-4">
+                    <h5>Total</h5>
+                    <h5>KES {{ "%.2f"|format(total) }}</h5>
+                </div>
+                
+                <a href="{{ url_for('checkout') }}" class="btn btn-success btn-lg w-100 mb-3">
+                    <i class="fas fa-shopping-bag"></i> Proceed to Checkout
+                </a>
+                
+                <div class="text-center">
+                    <small class="text-muted">
+                        <i class="fas fa-shield-alt"></i> Secure checkout
+                    </small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card shadow mt-4">
+            <div class="card-body">
+                <h6>Need help?</h6>
+                <p class="small text-muted">Contact our support team for assistance with your order.</p>
+                <a href="mailto:support@adiseware.com" class="btn btn-outline-success btn-sm">
+                    <i class="fas fa-envelope"></i> Email Support
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function removeFromCart(cartItemId) {
+    if (confirm('Remove this item from cart?')) {
+        fetch("{{ url_for('remove_cart_item') }}/" + cartItemId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+}
+</script>
+{% endblock %}
