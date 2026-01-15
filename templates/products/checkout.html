@@ -1,0 +1,248 @@
+{% extends "components/base.html" %}
+
+{% block title %}Checkout - Adiseware{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Checkout</h1>
+            <a href="{{ url_for('view_cart') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Cart
+            </a>
+        </div>
+        
+        <form method="POST" action="{{ url_for('checkout') }}">
+            <!-- Delivery Information -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Delivery Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" value="{{ current_user.full_name }}" readonly>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" value="{{ current_user.phone_number or '' }}" 
+                                   name="farmer_phone" required>
+                            <small class="text-muted">Required for delivery coordination</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="delivery_address" class="form-label">Delivery Address <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="delivery_address" name="delivery_address" 
+                                  rows="3" required placeholder="Enter your complete delivery address"></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Order Summary -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Order Summary</h5>
+                </div>
+                <div class="card-body">
+                    {% for agrovet_id, agrovet_data in agrovet_totals.items() %}
+                    <div class="border-bottom pb-3 mb-3">
+                        <div class="d-flex align-items-center mb-3">
+                            {% if agrovet_data.agrovet.profile_picture %}
+                            <img src="{{ url_for('static', filename='uploads/' + agrovet_data.agrovet.profile_picture) }}" 
+                                 class="rounded-circle me-3" width="40" height="40" alt="{{ agrovet_data.agrovet.full_name }}">
+                            {% else %}
+                            <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 40px; height: 40px;">
+                                <span class="text-white">{{ agrovet_data.agrovet.full_name[0] }}</span>
+                            </div>
+                            {% endif %}
+                            <div>
+                                <strong>{{ agrovet_data.agrovet.full_name }}</strong>
+                                <small class="text-muted d-block">{{ agrovet_data.items|length }} items</small>
+                            </div>
+                            <div class="ms-auto">
+                                <strong>KES {{ "%.2f"|format(agrovet_data.total) }}</strong>
+                            </div>
+                        </div>
+                        
+                        {% for item in agrovet_data.items %}
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span>{{ item.product.product_name }} × {{ item.quantity }}</span>
+                            <span>KES {{ "%.2f"|format(item.product.price * item.quantity) }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                    
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal</span>
+                        {% set subtotal = agrovet_totals.values()|sum(attribute='total') %}
+                        <span>KES {{ "%.2f"|format(subtotal) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Delivery</span>
+                        <span>KES 0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span>Tax</span>
+                        <span>KES 0.00</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <h5>Total</h5>
+                        <h5>KES {{ "%.2f"|format(subtotal) }}</h5>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Payment Method -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Payment Method</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <select class="form-select" name="payment_method" required>
+                            <option value="">Select payment method...</option>
+                            <option value="cash">Cash on Delivery</option>
+                            <option value="mpesa">M-Pesa</option>
+                            <option value="bank">Bank Transfer</option>
+                            <option value="card">Credit/Debit Card</option>
+                        </select>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        For M-Pesa payments, you will receive payment instructions after placing your order.
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Additional Notes -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Additional Notes</h5>
+                </div>
+                <div class="card-body">
+                    <textarea class="form-control" name="notes" rows="3" 
+                              placeholder="Special instructions, delivery preferences, etc."></textarea>
+                </div>
+            </div>
+            
+            <!-- Terms and Conditions -->
+            <div class="card shadow mb-4">
+                <div class="card-body">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="terms" required>
+                        <label class="form-check-label" for="terms">
+                            I agree to the <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">Terms and Conditions</a>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-between">
+                <a href="{{ url_for('view_cart') }}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="fas fa-shopping-bag"></i> Place Order
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card shadow sticky-top" style="top: 20px;">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">Order Summary</h5>
+            </div>
+            <div class="card-body">
+                {% for agrovet_id, agrovet_data in agrovet_totals.items() %}
+                <div class="border-bottom pb-2 mb-2">
+                    <div class="d-flex justify-content-between">
+                        <small>{{ agrovet_data.agrovet.full_name }}</small>
+                        <small>KES {{ "%.2f"|format(agrovet_data.total) }}</small>
+                    </div>
+                </div>
+                {% endfor %}
+                
+                <hr>
+                
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Subtotal</span>
+                    {% set subtotal = agrovet_totals.values()|sum(attribute='total') %}
+                    <span>KES {{ "%.2f"|format(subtotal) }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Delivery</span>
+                    <span>KES 0.00</span>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span>Tax</span>
+                    <span>KES 0.00</span>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <h5>Total</h5>
+                    <h5>KES {{ "%.2f"|format(subtotal) }}</h5>
+                </div>
+                
+                <div class="alert alert-success mt-3">
+                    <small>
+                        <i class="fas fa-shipping-fast"></i> Free delivery within city limits
+                    </small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card shadow mt-4">
+            <div class="card-body">
+                <h6>Need Help?</h6>
+                <p class="small text-muted">
+                    Contact our customer support for assistance with your order.
+                </p>
+                <div class="d-grid gap-2">
+                    <a href="mailto:support@adiseware.com" class="btn btn-outline-success btn-sm">
+                        <i class="fas fa-envelope"></i> Email Support
+                    </a>
+                    <a href="tel:+254700000000" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-phone"></i> Call Support
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Terms Modal -->
+<div class="modal fade" id="termsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Terms and Conditions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6>1. Order Processing</h6>
+                <p>Orders are processed within 24 hours. Agrovets will contact you to confirm availability and delivery details.</p>
+                
+                <h6>2. Delivery</h6>
+                <p>Delivery times vary by location and agrovet. Standard delivery is 2-5 business days.</p>
+                
+                <h6>3. Payment</h6>
+                <p>Payment is processed through secure methods. For cash on delivery, exact change is preferred.</p>
+                
+                <h6>4. Returns & Refunds</h6>
+                <p>Damaged or incorrect items can be returned within 7 days for exchange or refund.</p>
+                
+                <h6>5. Privacy</h6>
+                <p>Your personal information is protected and only shared with agrovets for order fulfillment.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
