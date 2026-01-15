@@ -1,0 +1,185 @@
+{% extends "components/base.html" %}
+
+{% block title %}Manage Users - Admin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Manage Users</h1>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                <i class="fas fa-user-plus"></i> Add User
+            </button>
+        </div>
+        
+        <div class="card shadow">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>User</th>
+                                <th>Email</th>
+                                <th>Type</th>
+                                <th>Joined</th>
+                                <th>Last Login</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ user.id }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if user.profile_picture %}
+                                        <img src="{{ url_for('static', filename='uploads/' + user.profile_picture) }}" 
+                                             class="rounded-circle me-2" width="30" height="30" alt="{{ user.full_name }}">
+                                        {% else %}
+                                        <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-2" 
+                                             style="width: 30px; height: 30px;">
+                                            <span class="text-white small">{{ user.full_name[0] }}</span>
+                                        </div>
+                                        {% endif %}
+                                        {{ user.full_name }}
+                                        {% if user.is_admin %}
+                                        <span class="badge bg-danger ms-2">Admin</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>{{ user.email }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ user.user_type|replace('_', ' ')|title }}</span>
+                                </td>
+                                <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    {% if user.last_login %}
+                                    {{ user.last_login.strftime('%Y-%m-%d') }}
+                                    {% else %}
+                                    <span class="text-muted">Never</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" 
+                                                onclick="viewUser({{ user.id }})">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-outline-warning" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#resetPasswordModal{{ user.id }}">
+                                            <i class="fas fa-key"></i>
+                                        </button>
+                                        <button class="btn btn-outline-{% if user.is_active %}danger{% else %}success{% endif %}" 
+                                                onclick="toggleUserStatus({{ user.id }})">
+                                            <i class="fas fa-{% if user.is_active %}ban{% else %}check{% endif %}"></i>
+                                        </button>
+                                        {% if not user.is_admin %}
+                                        <button class="btn btn-outline-info" 
+                                                onclick="makeAdmin({{ user.id }})">
+                                            <i class="fas fa-shield-alt"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Reset Password Modal -->
+                                    <div class="modal fade" id="resetPasswordModal{{ user.id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Reset Password for {{ user.full_name }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <form method="POST" action="{{ url_for('admin_reset_password', user_id=user.id) }}">
+                                                    <div class="modal-body">
+                                                        <div class="mb-3">
+                                                            <label for="new_password{{ user.id }}" class="form-label">New Password</label>
+                                                            <input type="password" class="form-control" 
+                                                                   id="new_password{{ user.id }}" name="new_password" required>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-danger">Reset Password</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Note: New users will receive an email to set their password.</p>
+                <!-- Form will be similar to registration form -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleUserStatus(userId) {
+    if (confirm('Are you sure you want to toggle this user\'s status?')) {
+        fetch("{{ url_for('toggle_user_status') }}/" + userId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+}
+
+function makeAdmin(userId) {
+    if (confirm('Make this user an administrator?')) {
+        fetch("{{ url_for('make_admin') }}/" + userId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: ''
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+}
+
+function viewUser(userId) {
+    window.location.href = "{{ url_for('user_reviews', user_id=0) }}".replace('0', userId);
+}
+</script>
+{% endblock %}

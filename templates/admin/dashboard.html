@@ -1,0 +1,184 @@
+{% extends "components/base.html" %}
+
+{% block title %}Admin Dashboard - Adiseware{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">Admin Dashboard</h1>
+        
+        <!-- Stats Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white shadow">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title">Total Users</h6>
+                                <h2 class="mb-0">{{ stats.total_users }}</h2>
+                            </div>
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="card bg-success text-white shadow">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title">Active Users</h6>
+                                <h2 class="mb-0">{{ stats.active_users }}</h2>
+                            </div>
+                            <i class="fas fa-user-check fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="card bg-info text-white shadow">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title">Total Posts</h6>
+                                <h2 class="mb-0">{{ stats.total_posts }}</h2>
+                            </div>
+                            <i class="fas fa-comments fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <div class="card bg-warning text-white shadow">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title">Total Revenue</h6>
+                                <h2 class="mb-0">KES {{ "%.2f"|format(stats.total_revenue) }}</h2>
+                            </div>
+                            <i class="fas fa-money-bill-wave fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Activity -->
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card shadow">
+                    <div class="card-header">
+                        <h5 class="mb-0">Recent User Activity</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Email</th>
+                                        <th>Type</th>
+                                        <th>Last Login</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for user in stats.recent_logins %}
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                {% if user.profile_picture %}
+                                                <img src="{{ url_for('static', filename='uploads/' + user.profile_picture) }}" 
+                                                     class="rounded-circle me-2" width="30" height="30" alt="{{ user.full_name }}">
+                                                {% else %}
+                                                <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-2" 
+                                                     style="width: 30px; height: 30px;">
+                                                    <span class="text-white small">{{ user.full_name[0] }}</span>
+                                                </div>
+                                                {% endif %}
+                                                {{ user.full_name }}
+                                            </div>
+                                        </td>
+                                        <td>{{ user.email }}</td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ user.user_type|replace('_', ' ')|title }}</span>
+                                        </td>
+                                        <td>
+                                            {% if user.last_login %}
+                                            {{ user.last_login.strftime('%Y-%m-%d %H:%M') }}
+                                            {% else %}
+                                            <span class="text-muted">Never</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if user.is_active %}
+                                            <span class="badge bg-success">Active</span>
+                                            {% else %}
+                                            <span class="badge bg-danger">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card shadow">
+                    <div class="card-header">
+                        <h5 class="mb-0">Quick Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('admin_users') }}" class="btn btn-success">
+                                <i class="fas fa-users"></i> Manage Users
+                            </a>
+                            <a href="{{ url_for('view_recommendations') }}" class="btn btn-primary">
+                                <i class="fas fa-lightbulb"></i> View Suggestions
+                            </a>
+                            <a href="{{ url_for('community') }}" class="btn btn-info">
+                                <i class="fas fa-comments"></i> Monitor Community
+                            </a>
+                            <button class="btn btn-warning">
+                                <i class="fas fa-chart-bar"></i> View Reports
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card shadow mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">System Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted">Database</small>
+                            <div class="progress" style="height: 5px;">
+                                <div class="progress-bar bg-success" style="width: 25%"></div>
+                            </div>
+                            <small>25% used</small>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Storage</small>
+                            <div class="progress" style="height: 5px;">
+                                <div class="progress-bar bg-info" style="width: 60%"></div>
+                            </div>
+                            <small>60% used</small>
+                        </div>
+                        <div>
+                            <small class="text-muted">Active Sessions</small>
+                            <h4 class="mb-0">{{ stats.active_users }}</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
