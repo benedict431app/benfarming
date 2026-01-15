@@ -25,18 +25,23 @@ class User(UserMixin, db.Model):
     last_login = db.Column(db.DateTime)
     email_confirmed = db.Column(db.Boolean, default=False)
     
-    inventory_items = db.relationship('InventoryItem', backref='agrovet', lazy=True, cascade='all, delete-orphan')
-    sales = db.relationship('Sale', backref='agrovet', lazy=True, cascade='all, delete-orphan')
-    customers = db.relationship('Customer', backref='agrovet', lazy=True, cascade='all, delete-orphan')
-    disease_reports = db.relationship('DiseaseReport', backref='farmer', lazy=True, cascade='all, delete-orphan')
-    notifications = db.relationship('Notification', backref='user', lazy=True, cascade='all, delete-orphan')
-    posts = db.relationship('CommunityPost', backref='author', lazy=True, cascade='all, delete-orphan')
-    comments = db.relationship('PostComment', backref='author', lazy=True, cascade='all, delete-orphan')
+    # Relationships
+    inventory_items = db.relationship('InventoryItem', backref='agrovet', lazy=True)
+    customers = db.relationship('Customer', backref='agrovet', lazy=True)
+    sales = db.relationship('Sale', backref='agrovet', lazy=True)
+    disease_reports = db.relationship('DiseaseReport', backref='farmer', lazy=True)
+    notifications = db.relationship('Notification', backref='user', lazy=True)
+    posts = db.relationship('CommunityPost', backref='author', lazy=True)
+    comments = db.relationship('PostComment', backref='author', lazy=True)
+    
+    # Reviews given and received
     reviews_given = db.relationship('UserReview', foreign_keys='UserReview.reviewer_id', backref='reviewer', lazy=True)
     reviews_received = db.relationship('UserReview', foreign_keys='UserReview.user_id', backref='user', lazy=True)
-    recommendations = db.relationship('AppRecommendation', backref='author', lazy=True, cascade='all, delete-orphan')
-    cart_items = db.relationship('CartItem', backref='user', lazy=True, cascade='all, delete-orphan')
-    following_posts = db.relationship('PostFollow', backref='user', lazy=True, cascade='all, delete-orphan')
+    
+    # Other relationships
+    recommendations = db.relationship('AppRecommendation', backref='author', lazy=True)
+    cart_items = db.relationship('CartItem', backref='user', lazy=True)
+    following_posts = db.relationship('PostFollow', backref='user', lazy=True)
     orders_as_farmer = db.relationship('Order', foreign_keys='Order.farmer_id', backref='farmer', lazy=True)
     orders_as_agrovet = db.relationship('Order', foreign_keys='Order.agrovet_id', backref='agrovet', lazy=True)
     sent_messages = db.relationship('Message', foreign_keys='Message.sender_id', backref='sender', lazy=True)
@@ -47,9 +52,6 @@ class User(UserMixin, db.Model):
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-    
-    def get_unread_notifications_count(self):
-        return Notification.query.filter_by(user_id=self.id, is_read=False).count()
 
 class InventoryItem(db.Model):
     __tablename__ = 'inventory_items'
@@ -70,10 +72,6 @@ class InventoryItem(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    cart_items = db.relationship('CartItem', backref='product', lazy=True, cascade='all, delete-orphan')
-    order_items = db.relationship('OrderItem', backref='product', lazy=True, cascade='all, delete-orphan')
-    messages = db.relationship('Message', backref='product', lazy=True, cascade='all, delete-orphan')
-    
     def is_low_stock(self):
         return self.quantity <= self.reorder_level
 
@@ -93,7 +91,7 @@ class Customer(db.Model):
     last_purchase = db.Column(db.DateTime)
     
     purchases = db.relationship('Sale', backref='customer', lazy=True)
-    communications = db.relationship('Communication', backref='customer', lazy=True, cascade='all, delete-orphan')
+    communications = db.relationship('Communication', backref='customer', lazy=True)
 
 class Sale(db.Model):
     __tablename__ = 'sales'
@@ -107,7 +105,7 @@ class Sale(db.Model):
     status = db.Column(db.String(50), default='completed')
     receipt_number = db.Column(db.String(100), unique=True)
     
-    items = db.relationship('SaleItem', backref='sale', lazy=True, cascade='all, delete-orphan')
+    items = db.relationship('SaleItem', backref='sale', lazy=True)
 
 class SaleItem(db.Model):
     __tablename__ = 'sale_items'
@@ -186,9 +184,8 @@ class CommunityPost(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    comments = db.relationship('PostComment', backref='post', lazy=True, cascade='all, delete-orphan')
-    followers = db.relationship('PostFollow', backref='post', lazy=True, cascade='all, delete-orphan')
-    tags = db.relationship('PostTag', backref='post', lazy=True, cascade='all, delete-orphan')
+    comments = db.relationship('PostComment', backref='post', lazy=True)
+    followers = db.relationship('PostFollow', backref='post', lazy=True)
 
 class PostComment(db.Model):
     __tablename__ = 'post_comments'
@@ -211,14 +208,6 @@ class PostFollow(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     __table_args__ = (db.UniqueConstraint('post_id', 'user_id', name='unique_follow'),)
-
-class PostTag(db.Model):
-    __tablename__ = 'post_tags'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    post_id = db.Column(db.Integer, db.ForeignKey('community_posts.id'), nullable=False)
-    tag_name = db.Column(db.String(50), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class UserReview(db.Model):
     __tablename__ = 'user_reviews'
@@ -254,8 +243,6 @@ class CartItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('inventory_items.id'), nullable=False)
     quantity = db.Column(db.Integer, default=1)
     added_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    __table_args__ = (db.UniqueConstraint('user_id', 'product_id', name='unique_cart_item'),)
 
 class Order(db.Model):
     __tablename__ = 'orders'
@@ -273,7 +260,7 @@ class Order(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    items = db.relationship('OrderItem', backref='order', lazy=True, cascade='all, delete-orphan')
+    items = db.relationship('OrderItem', backref='order', lazy=True)
 
 class OrderItem(db.Model):
     __tablename__ = 'order_items'
