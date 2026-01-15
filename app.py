@@ -15,6 +15,12 @@ import base64
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from models import (
+    db, User, InventoryItem, Customer, Sale, SaleItem, Communication, 
+    DiseaseReport, Notification, WeatherData, CommunityPost, PostComment, 
+    PostFollow, UserReview, AppRecommendation, CartItem, Order, OrderItem, 
+    PasswordResetToken, Message
+)
 
 app = Flask(__name__)
 app.config.from_object(Config)
