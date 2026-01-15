@@ -99,22 +99,36 @@
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="notificationsDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="fas fa-bell"></i>
-                                {% if current_user.get_unread_notifications_count() > 0 %}
-                                <span class="badge bg-danger">{{ current_user.get_unread_notifications_count() }}</span>
+                                {% set unread_count = 0 %}
+                                {% for notification in current_user.notifications %}
+                                    {% if not notification.is_read %}
+                                        {% set unread_count = unread_count + 1 %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% if unread_count > 0 %}
+                                <span class="badge bg-danger">{{ unread_count }}</span>
                                 {% endif %}
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><h6 class="dropdown-header">Notifications</h6></li>
-                                {% for notification in current_user.notifications|selectattr('is_read', 'equalto', false)|list[:5] %}
-                                <li>
-                                    <a class="dropdown-item" href="{{ notification.link or '#' }}">
-                                        <strong>{{ notification.title }}</strong>
-                                        <p class="mb-0 small text-muted">{{ notification.message[:50] }}...</p>
-                                    </a>
-                                </li>
-                                {% else %}
-                                <li><a class="dropdown-item" href="#">No new notifications</a></li>
+                                
+                                {% set displayed_notifications = 0 %}
+                                {% for notification in current_user.notifications %}
+                                    {% if not notification.is_read and displayed_notifications < 5 %}
+                                        {% set displayed_notifications = displayed_notifications + 1 %}
+                                        <li>
+                                            <a class="dropdown-item" href="{{ notification.link or '#' }}">
+                                                <strong>{{ notification.title }}</strong>
+                                                <p class="mb-0 small text-muted">{{ notification.message[:50] }}...</p>
+                                            </a>
+                                        </li>
+                                    {% endif %}
                                 {% endfor %}
+                                
+                                {% if displayed_notifications == 0 %}
+                                <li><a class="dropdown-item" href="#">No new notifications</a></li>
+                                {% endif %}
+                                
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="#">View all notifications</a></li>
                             </ul>
@@ -209,13 +223,13 @@
                 </div>
                 <div class="col-md-4">
                     <h5>Contact</h5>
-                    <p class="mb-0">Email: support@adiseware.com</p>
-                    <p class="mb-0">Phone: +254 700 000 000</p>
+                    <p class="mb-0">Email: benedict431@gmail.com</p>
+                    <p class="mb-0">Phone: +254 713593573</p>
                 </div>
             </div>
             <hr class="bg-white">
             <div class="text-center">
-                <p class="mb-0">&copy; 2024 Adiseware. All rights reserved.</p>
+                <p class="mb-0">&copy; 2026 Adiseware. All rights reserved.</p>
             </div>
         </div>
     </footer>
