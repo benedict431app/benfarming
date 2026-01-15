@@ -1,0 +1,99 @@
+{% extends "components/base.html" %}
+
+{% block title %}App Recommendations - Adiseware{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>App Recommendations</h1>
+            <a href="{{ url_for('add_recommendation') }}" class="btn btn-success">
+                <i class="fas fa-plus"></i> New Suggestion
+            </a>
+        </div>
+        
+        <div class="card shadow mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Share your ideas to improve Adiseware</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    We value your feedback! Share your suggestions for new features, report bugs, 
+                    or suggest improvements to make Adiseware better for everyone.
+                </p>
+            </div>
+        </div>
+        
+        {% if recommendations %}
+        {% for recommendation in recommendations %}
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h5 class="mb-1">{{ recommendation.title }}</h5>
+                        <p class="text-muted mb-1">
+                            <i class="fas fa-user"></i> {{ recommendation.author.full_name }}
+                            • <i class="fas fa-clock"></i> {{ recommendation.created_at.strftime('%Y-%m-%d') }}
+                            • <span class="badge bg-{{ 'success' if recommendation.status == 'implemented' else 'warning' if recommendation.status == 'reviewed' else 'info' }}">
+                                {{ recommendation.status|title }}
+                            </span>
+                            <span class="badge bg-secondary">{{ recommendation.category|title }}</span>
+                        </p>
+                    </div>
+                    <div class="text-end">
+                        <button class="btn btn-outline-success btn-sm" 
+                                onclick="upvoteRecommendation({{ recommendation.id }})">
+                            <i class="fas fa-thumbs-up"></i> {{ recommendation.upvotes }}
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    {{ recommendation.content|replace('\n', '<br>')|safe }}
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        {% if current_user.is_admin %}
+                        <button class="btn btn-sm btn-outline-primary">Mark as Reviewed</button>
+                        {% endif %}
+                    </small>
+                    <div>
+                        {% if recommendation.author_id == current_user.id %}
+                        <button class="btn btn-sm btn-outline-secondary">Edit</button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-lightbulb fa-3x text-muted mb-3"></i>
+            <h3>No suggestions yet</h3>
+            <p class="text-muted">Be the first to share your ideas!</p>
+            <a href="{{ url_for('add_recommendation') }}" class="btn btn-success">
+                <i class="fas fa-plus"></i> Add First Suggestion
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function upvoteRecommendation(recId) {
+    fetch("{{ url_for('upvote_recommendation') }}/" + recId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        }
+    });
+}
+</script>
+{% endblock %}
