@@ -1,0 +1,136 @@
+{% extends "components/base.html" %}
+
+{% block title %}Messages - Adiseware{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Messages</h1>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#newMessageModal">
+                <i class="fas fa-plus"></i> New Message
+            </button>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card shadow">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">Conversations</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        {% if conversations %}
+                        <div class="list-group list-group-flush">
+                            {% for conv in conversations %}
+                            <a href="{{ url_for('chat_with_user', user_id=conv.user.id) }}" 
+                               class="list-group-item list-group-item-action {% if request.endpoint == 'chat_with_user' and request.view_args.user_id == conv.user.id %}active{% endif %}">
+                                <div class="d-flex align-items-center">
+                                    {% if conv.user.profile_picture %}
+                                    <img src="{{ url_for('static', filename='uploads/' + conv.user.profile_picture) }}" 
+                                         class="rounded-circle me-3" width="45" height="45" alt="{{ conv.user.full_name }}">
+                                    {% else %}
+                                    <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-3" 
+                                         style="width: 45px; height: 45px;">
+                                        <span class="text-white">{{ conv.user.full_name[0] }}</span>
+                                    </div>
+                                    {% endif %}
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex justify-content-between">
+                                            <strong>{{ conv.user.full_name }}</strong>
+                                            <small class="text-muted">{{ conv.last_message.created_at.strftime('%H:%M') }}</small>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <small class="text-truncate" style="max-width: 150px;">
+                                                {% if conv.last_message.message_type == 'image' %}
+                                                <i class="fas fa-image"></i> Image
+                                                {% else %}
+                                                {{ conv.last_message.content[:30] }}{% if conv.last_message.content|length > 30 %}...{% endif %}
+                                                {% endif %}
+                                            </small>
+                                            {% if conv.unread_count > 0 %}
+                                            <span class="badge bg-danger rounded-pill">{{ conv.unread_count }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-comments fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No conversations yet</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-8">
+                <div class="card shadow h-100">
+                    <div class="card-body d-flex align-items-center justify-content-center">
+                        <div class="text-center">
+                            <i class="fas fa-comment-dots fa-3x text-muted mb-3"></i>
+                            <h4>Select a conversation</h4>
+                            <p class="text-muted">Choose a conversation from the list or start a new one</p>
+                            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#newMessageModal">
+                                <i class="fas fa-plus"></i> Start New Conversation
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Message Modal -->
+<div class="modal fade" id="newMessageModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New Message</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="newMessageForm">
+                    <div class="mb-3">
+                        <label for="recipient" class="form-label">To:</label>
+                        <select class="form-select" id="recipient" required>
+                            <option value="">Select user...</option>
+                            {% for user in all_users %}
+                            {% if user.id != current_user.id %}
+                            <option value="{{ user.id }}">{{ user.full_name }} ({{ user.user_type|replace('_', ' ')|title }})</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="message_content" class="form-label">Message:</label>
+                        <textarea class="form-control" id="message_content" rows="4" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="startNewConversation()">Send Message</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function startNewConversation() {
+    const recipientId = document.getElementById('recipient').value;
+    const message = document.getElementById('message_content').value;
+    
+    if (!recipientId || !message) {
+        alert('Please select a recipient and enter a message');
+        return;
+    }
+    
+    // Redirect to chat with the selected user
+    window.location.href = "{{ url_for('chat_with_user', user_id=0) }}".replace('0', recipientId);
+}
+</script>
+{% endblock %}

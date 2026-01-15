@@ -1,0 +1,171 @@
+{% extends "components/base.html" %}
+
+{% block title %}Chat with {{ other_user.full_name }} - Adiseware{% endblock %}
+
+{% block extra_css %}
+<style>
+.chat-container {
+    height: 70vh;
+    overflow-y: auto;
+}
+.message-bubble {
+    max-width: 70%;
+    border-radius: 15px;
+    padding: 10px 15px;
+    margin-bottom: 10px;
+    position: relative;
+}
+.message-sent {
+    background-color: #198754;
+    color: white;
+    margin-left: auto;
+}
+.message-received {
+    background-color: #f8f9fa;
+    color: #212529;
+    border: 1px solid #dee2e6;
+}
+.message-time {
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex align-items-center mb-4">
+            <a href="{{ url_for('messages') }}" class="btn btn-outline-secondary me-3">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            {% if other_user.profile_picture %}
+            <img src="{{ url_for('static', filename='uploads/' + other_user.profile_picture) }}" 
+                 class="rounded-circle me-3" width="50" height="50" alt="{{ other_user.full_name }}">
+            {% else %}
+            <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-3" 
+                 style="width: 50px; height: 50px;">
+                <span class="text-white h5">{{ other_user.full_name[0] }}</span>
+            </div>
+            {% endif %}
+            <div>
+                <h4 class="mb-0">{{ other_user.full_name }}</h4>
+                <small class="text-muted">{{ other_user.user_type|replace('_', ' ')|title }}</small>
+            </div>
+            <div class="ms-auto">
+                <a href="{{ url_for('user_reviews', user_id=other_user.id) }}" class="btn btn-outline-success btn-sm">
+                    <i class="fas fa-star"></i> Reviews
+                </a>
+                {% if other_user.user_type == 'agrovet' %}
+                <a href="{{ url_for('agrovet_products', agrovet_id=other_user.id) }}" class="btn btn-success btn-sm">
+                    <i class="fas fa-store"></i> View Products
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card shadow">
+            <div class="card-body p-0">
+                <!-- Chat Messages -->
+                <div class="chat-container p-3" id="chatMessages">
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="d-flex {% if message.sender_id == current_user.id %}justify-content-end{% endif %} mb-3">
+                        <div class="message-bubble {% if message.sender_id == current_user.id %}message-sent{% else %}message-received{% endif %}">
+                            {% if message.message_type == 'image' %}
+                            <div class="mb-2">
+                                <img src="{{ url_for('static', filename='uploads/' + message.image_url) }}" 
+                                     class="img-fluid rounded" alt="Image">
+                            </div>
+                            {% endif %}
+                            
+                            {% if message.content %}
+                            <div>{{ message.content|replace('\n', '<br>')|safe }}</div>
+                            {% endif %}
+                            
+                            {% if message.product %}
+                            <div class="mt-2 p-2 bg-white rounded border">
+                                <small class="text-muted">Product Inquiry:</small>
+                                <div class="d-flex align-items-center">
+                                    <div>
+                                        <strong>{{ message.product.product_name }}</strong>
+                                        <div class="small">KES {{ "%.2f"|format(message.product.price) }}</div>
+                                    </div>
+                                    <a href="{{ url_for('agrovet_products', agrovet_id=message.product.agrovet_id) }}" 
+                                       class="btn btn-sm btn-outline-success ms-auto">
+                                        View
+                                    </a>
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="message-time mt-1 text-end">
+                                {{ message.created_at.strftime('%H:%M') }}
+                                {% if message.sender_id == current_user.id and message.is_read %}
+                                <i class="fas fa-check-double text-info ms-1"></i>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-comments fa-3x text-muted mb-3"></i>
+                        <h5>Start a conversation</h5>
+                        <p class="text-muted">Send a message to {{ other_user.full_name }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Message Input -->
+                <div class="border-top p-3">
+                    <form method="POST" action="{{ url_for('chat_with_user', user_id=other_user.id) }}" 
+                          enctype="multipart/form-data" id="messageForm">
+                        <div class="row g-2">
+                            <div class="col">
+                                <textarea class="form-control" name="message" rows="2" 
+                                          placeholder="Type your message..." required></textarea>
+                            </div>
+                            <div class="col-auto">
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-outline-success" 
+                                            onclick="document.getElementById('imageInput').click()">
+                                        <i class="fas fa-image"></i>
+                                    </button>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                                <input type="file" id="imageInput" name="image" accept="image/*" 
+                                       style="display: none;" onchange="this.form.submit()">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Scroll to bottom of chat
+const chatContainer = document.getElementById('chatMessages');
+chatContainer.scrollTop = chatContainer.scrollHeight;
+
+// Auto-refresh messages every 10 seconds
+setInterval(() => {
+    fetch(window.location.href)
+        .then(response => response.text())
+        .then(html => {
+            // Parse HTML and update only messages
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newMessages = doc.querySelector('#chatMessages');
+            if (newMessages) {
+                document.querySelector('#chatMessages').innerHTML = newMessages.innerHTML;
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        });
+}, 10000);
+</script>
+{% endblock %}
