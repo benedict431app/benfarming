@@ -1,13 +1,11 @@
 import os
 import uuid
-import math
-from datetime import datetime, timedelta
+from datetime import datetime
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
-from sqlalchemy import desc, or_, and_, func, text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy import desc, or_, func
 from config import Config
 
 app = Flask(__name__)
@@ -39,8 +37,9 @@ def admin_required(f):
     return decorated_function
 
 # Create necessary directories
-os.makedirs('uploads/products', exist_ok=True)
+os.makedirs('uploads', exist_ok=True)
 os.makedirs('uploads/profiles', exist_ok=True)
+os.makedirs('static/images', exist_ok=True)
 
 # ==================== DATABASE INITIALIZATION ====================
 
@@ -48,7 +47,7 @@ def init_database():
     """Initialize the SQLite database"""
     with app.app_context():
         try:
-            print(f"📊 Initializing SQLite database: {app.config['SQLALCHEMY_DATABASE_URI']}")
+            print(f"📊 Initializing SQLite database...")
             
             # Create all tables
             db.create_all()
@@ -64,36 +63,20 @@ def init_database():
                     user_type='admin',
                     is_admin=True,
                     is_verified=True,
-                    is_active=True,
-                    profile_picture='default-avatar.png'
+                    is_active=True
                 )
                 admin.set_password('Admin@123')
                 db.session.add(admin)
                 db.session.commit()
                 print("✅ Admin user created: admin@agriconnect.com / Admin@123")
             
-            # Create default system settings
-            default_settings = [
-                ('site_name', 'AgriConnect', 'Website name'),
-                ('site_description', 'Connecting Farmers and Agrovets', 'Website description'),
-                ('contact_email', 'support@agriconnect.com', 'Contact email'),
-                ('contact_phone', '+254 700 000 000', 'Contact phone'),
-                ('currency', 'KES', 'Default currency'),
-                ('tax_rate', '0.16', 'Tax rate (16% VAT)'),
-                ('shipping_fee', '200', 'Default shipping fee'),
-                ('free_shipping_threshold', '5000', 'Minimum order for free shipping'),
-            ]
-            
-            for key, value, description in default_settings:
-                if not SystemSetting.query.filter_by(key=key).first():
-                    setting = SystemSetting(key=key, value=value, description=description)
-                    db.session.add(setting)
+            # Create cart for admin
+            if not Cart.query.filter_by(user_id=1).first():
+                cart = Cart(user_id=1)
+                db.session.add(cart)
             
             db.session.commit()
             print("✅ Database initialization complete!")
-            
-            # Add some sample data for testing
-            add_sample_data()
             
         except Exception as e:
             print(f"❌ Database initialization error: {e}")
@@ -102,93 +85,6 @@ def init_database():
             return False
     
     return True
-
-def add_sample_data():
-    """Add sample data for testing"""
-    from models import User, InventoryItem
-    
-    # Check if we already have sample data
-    if User.query.filter_by(user_type='farmer').count() == 0:
-        # Create sample farmer
-        farmer = User(
-            email='farmer@example.com',
-            full_name='John Farmer',
-            user_type='farmer',
-            phone_number='+254712345678',
-            location='Nairobi',
-            is_active=True,
-            profile_picture='default-avatar.png'
-        )
-        farmer.set_password('Farmer@123')
-        db.session.add(farmer)
-        
-        # Create sample agrovet
-        agrovet = User(
-            email='agrovet@example.com',
-            full_name='Green Agro Supplies',
-            user_type='agrovet',
-            phone_number='+254723456789',
-            location='Nakuru',
-            business_name='Green Agro Supplies',
-            business_description='Your trusted agricultural supplier',
-            is_active=True,
-            profile_picture='default-avatar.png'
-        )
-        agrovet.set_password('Agrovet@123')
-        db.session.add(agrovet)
-        
-        db.session.commit()
-        
-        # Create sample products
-        sample_products = [
-            {
-                'agrovet_id': agrovet.id,
-                'product_name': 'Maize Seeds (Hybrid)',
-                'category': 'Seeds',
-                'description': 'High-yield hybrid maize seeds, 1kg pack',
-                'quantity': 100,
-                'price': 450.00,
-                'unit': 'kg',
-                'is_active': True
-            },
-            {
-                'agrovet_id': agrovet.id,
-                'product_name': 'NPK Fertilizer',
-                'category': 'Fertilizers',
-                'description': 'Balanced NPK fertilizer 50kg bag',
-                'quantity': 50,
-                'price': 3500.00,
-                'unit': 'bag',
-                'is_active': True
-            },
-            {
-                'agrovet_id': agrovet.id,
-                'product_name': 'Pesticide Spray',
-                'category': 'Chemicals',
-                'description': 'Broad-spectrum pesticide 1 liter',
-                'quantity': 80,
-                'price': 850.00,
-                'unit': 'liter',
-                'is_active': True
-            },
-            {
-                'agrovet_id': agrovet.id,
-                'product_name': 'Garden Hoe',
-                'category': 'Tools',
-                'description': 'Stainless steel garden hoe',
-                'quantity': 30,
-                'price': 750.00,
-                'unit': 'piece',
-                'is_active': True
-            }
-        ]
-        
-        for product_data in sample_products:
-            product = InventoryItem(**product_data)
-            db.session.add(product)
-        
-        db.session.commit()
-        print("✅ Sample data added successfully")
 
 # ==================== BASIC ROUTES ====================
 
@@ -211,27 +107,14 @@ def index():
                              recent_posts=recent_posts)
     except Exception as e:
         print(f"Error loading homepage: {e}")
-        # If database error, show setup page
-        return render_template('setup.html')
+        # If database error, reinitialize
+        init_database()
+        return render_template('welcome.html')
 
-@app.route('/setup')
-def setup():
-    """Setup page for initial database setup"""
-    return render_template('setup.html')
-
-@app.route('/init', methods=['POST'])
-def init_system():
-    """Initialize the system (for manual setup)"""
-    try:
-        if init_database():
-            flash('System initialized successfully!', 'success')
-            return redirect(url_for('index'))
-        else:
-            flash('System initialization failed', 'danger')
-            return redirect(url_for('setup'))
-    except Exception as e:
-        flash(f'Error: {str(e)}', 'danger')
-        return redirect(url_for('setup'))
+@app.route('/welcome')
+def welcome():
+    """Welcome page for first-time visitors"""
+    return render_template('welcome.html')
 
 # ==================== USER AUTHENTICATION ====================
 
@@ -266,6 +149,17 @@ def register():
                 flash('Email already registered', 'danger')
                 return redirect(url_for('register'))
             
+            # Handle profile picture
+            profile_picture = 'default-avatar.png'
+            if 'profile_picture' in request.files:
+                file = request.files['profile_picture']
+                if file and file.filename != '':
+                    if allowed_file(file.filename):
+                        filename = secure_filename(f"{uuid.uuid4().hex}_{file.filename}")
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'profiles', filename)
+                        file.save(filepath)
+                        profile_picture = filename
+            
             # Create user
             user = User(
                 email=email,
@@ -274,7 +168,7 @@ def register():
                 phone_number=phone_number,
                 location=location,
                 is_active=True,
-                profile_picture='default-avatar.png'
+                profile_picture=profile_picture
             )
             user.set_password(password)
             
@@ -296,7 +190,8 @@ def register():
             
         except Exception as e:
             db.session.rollback()
-            flash(f'Registration error: {str(e)}', 'danger')
+            print(f"Registration error: {e}")
+            flash(f'Registration error: Please try again', 'danger')
             return redirect(url_for('register'))
     
     return render_template('auth/register.html')
@@ -341,7 +236,8 @@ def login():
                 flash('Invalid email or password', 'danger')
                 
         except Exception as e:
-            flash(f'Login error: {str(e)}', 'danger')
+            print(f"Login error: {e}")
+            flash(f'Login error: Please try again', 'danger')
     
     return render_template('auth/login.html')
 
@@ -353,13 +249,103 @@ def logout():
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
 
+# Helper function for file uploads
+def allowed_file(filename):
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# ==================== PROFILE ROUTES ====================
+
+@app.route('/profile')
+@login_required
+def profile():
+    """User profile"""
+    from models import Order, CommunityPost, PostAnswer
+    
+    # Get user statistics
+    total_orders = Order.query.filter_by(user_id=current_user.id).count()
+    total_posts = CommunityPost.query.filter_by(user_id=current_user.id).count()
+    total_answers = PostAnswer.query.filter_by(user_id=current_user.id).count()
+    
+    # Get recent activity
+    recent_orders = Order.query.filter_by(user_id=current_user.id).order_by(
+        desc(Order.created_at)
+    ).limit(5).all()
+    
+    recent_posts = CommunityPost.query.filter_by(user_id=current_user.id).order_by(
+        desc(CommunityPost.created_at)
+    ).limit(5).all()
+    
+    return render_template('profile.html',
+                         total_orders=total_orders,
+                         total_posts=total_posts,
+                         total_answers=total_answers,
+                         recent_orders=recent_orders,
+                         recent_posts=recent_posts)
+
+@app.route('/profile/edit', methods=['GET', 'POST'])
+@login_required
+def edit_profile():
+    """Edit user profile"""
+    if request.method == 'POST':
+        try:
+            current_user.full_name = request.form.get('full_name')
+            current_user.phone_number = request.form.get('phone_number')
+            current_user.location = request.form.get('location')
+            current_user.address = request.form.get('address')
+            
+            # Handle profile picture
+            if 'profile_picture' in request.files:
+                file = request.files['profile_picture']
+                if file and file.filename != '':
+                    if allowed_file(file.filename):
+                        # Delete old profile picture if exists
+                        if current_user.profile_picture and current_user.profile_picture != 'default-avatar.png':
+                            old_path = os.path.join(app.config['UPLOAD_FOLDER'], 'profiles', current_user.profile_picture)
+                            if os.path.exists(old_path):
+                                os.remove(old_path)
+                        
+                        # Save new profile picture
+                        filename = secure_filename(f"{current_user.id}_{uuid.uuid4().hex}_{file.filename}")
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'profiles', filename)
+                        file.save(filepath)
+                        current_user.profile_picture = filename
+            
+            # Update agrovet business info
+            if current_user.user_type == 'agrovet':
+                current_user.business_name = request.form.get('business_name')
+                current_user.business_description = request.form.get('business_description')
+            
+            db.session.commit()
+            flash('Profile updated successfully!', 'success')
+            return redirect(url_for('profile'))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"Profile update error: {e}")
+            flash('Error updating profile. Please try again.', 'danger')
+    
+    return render_template('edit_profile.html')
+
+# ==================== FILE SERVING ====================
+
+@app.route('/uploads/<path:filename>')
+def uploaded_file(filename):
+    """Serve uploaded files"""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route('/static/images/<path:filename>')
+def static_image(filename):
+    """Serve static images"""
+    return send_from_directory('static/images', filename)
+
 # ==================== FARMER DASHBOARD ====================
 
 @app.route('/farmer/dashboard')
 @login_required
 def farmer_dashboard():
     """Farmer dashboard"""
-    if current_user.user_type != 'farmer':
+    if current_user.user_type != 'farmer' and not current_user.is_admin:
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
@@ -391,7 +377,7 @@ def farmer_dashboard():
 @login_required
 def agrovet_dashboard():
     """Agrovet dashboard"""
-    if current_user.user_type != 'agrovet':
+    if current_user.user_type != 'agrovet' and not current_user.is_admin:
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
@@ -457,102 +443,6 @@ def marketplace():
                          categories=categories,
                          current_category=category,
                          search=search)
-
-@app.route('/product/<int:product_id>')
-def product_detail(product_id):
-    """Product detail page"""
-    from models import InventoryItem, User
-    
-    product = InventoryItem.query.get_or_404(product_id)
-    
-    if not product.is_active:
-        flash('This product is not available', 'warning')
-        return redirect(url_for('marketplace'))
-    
-    # Get agrovet details
-    agrovet = User.query.get(product.agrovet_id)
-    
-    # Get related products
-    related_products = InventoryItem.query.filter(
-        InventoryItem.category == product.category,
-        InventoryItem.id != product.id,
-        InventoryItem.is_active == True
-    ).limit(4).all()
-    
-    return render_template('product_detail.html',
-                         product=product,
-                         agrovet=agrovet,
-                         related_products=related_products)
-
-# ==================== CART & ORDERS ====================
-
-@app.route('/cart')
-@login_required
-def view_cart():
-    """View shopping cart"""
-    from models import Cart, CartItem
-    
-    cart = current_user.cart
-    
-    if not cart:
-        cart = Cart(user_id=current_user.id)
-        db.session.add(cart)
-        db.session.commit()
-    
-    cart_items = CartItem.query.filter_by(cart_id=cart.id).all()
-    
-    total_price = 0
-    for item in cart_items:
-        if item.product and item.product.is_active:
-            total_price += item.product.price * item.quantity
-    
-    return render_template('cart.html',
-                         cart_items=cart_items,
-                         total_price=total_price)
-
-@app.route('/cart/add/<int:product_id>', methods=['POST'])
-@login_required
-def add_to_cart(product_id):
-    """Add product to cart"""
-    from models import InventoryItem, Cart, CartItem
-    
-    product = InventoryItem.query.get_or_404(product_id)
-    
-    if not product.is_active or product.quantity <= 0:
-        return jsonify({'success': False, 'error': 'Product not available'}), 400
-    
-    cart = current_user.cart
-    
-    if not cart:
-        cart = Cart(user_id=current_user.id)
-        db.session.add(cart)
-        db.session.commit()
-    
-    # Check if product is already in cart
-    existing_item = CartItem.query.filter_by(
-        cart_id=cart.id,
-        product_id=product_id
-    ).first()
-    
-    if existing_item:
-        # Update quantity
-        new_quantity = existing_item.quantity + 1
-        if new_quantity > product.quantity:
-            return jsonify({'success': False, 'error': 'Not enough stock'}), 400
-        
-        existing_item.quantity = new_quantity
-    else:
-        # Add new item
-        cart_item = CartItem(
-            cart_id=cart.id,
-            product_id=product_id,
-            quantity=1
-        )
-        db.session.add(cart_item)
-    
-    db.session.commit()
-    
-    return jsonify({'success': True, 'message': 'Product added to cart'})
 
 # ==================== ADMIN ROUTES ====================
 
@@ -632,95 +522,6 @@ def admin_users():
                          users=users,
                          search=search)
 
-# ==================== COMMUNITY ====================
-
-@app.route('/community')
-def community_home():
-    """Community homepage"""
-    from models import CommunityPost
-    
-    search = request.args.get('search', '')
-    
-    query = CommunityPost.query
-    
-    if search:
-        query = query.filter(or_(
-            CommunityPost.title.ilike(f'%{search}%'),
-            CommunityPost.content.ilike(f'%{search}%')
-        ))
-    
-    posts = query.order_by(desc(CommunityPost.created_at)).all()
-    
-    return render_template('community/home.html',
-                         posts=posts,
-                         search=search)
-
-@app.route('/community/create', methods=['GET', 'POST'])
-@login_required
-def create_community_post():
-    """Create community post"""
-    from models import CommunityPost, PostFollow
-    
-    if request.method == 'POST':
-        title = request.form.get('title')
-        content = request.form.get('content')
-        post_type = request.form.get('post_type', 'question')
-        category = request.form.get('category', 'general')
-        
-        if not title or not content:
-            flash('Title and content are required', 'danger')
-            return redirect(url_for('create_community_post'))
-        
-        post = CommunityPost(
-            user_id=current_user.id,
-            title=title,
-            content=content,
-            post_type=post_type,
-            category=category
-        )
-        
-        db.session.add(post)
-        db.session.commit()
-        
-        # Auto-follow own post
-        follow = PostFollow(post=post, user_id=current_user.id)
-        db.session.add(follow)
-        db.session.commit()
-        
-        flash('Post created successfully!', 'success')
-        return redirect(url_for('view_community_post', post_id=post.id))
-    
-    return render_template('community/create_post.html')
-
-# ==================== PROFILE ====================
-
-@app.route('/profile')
-@login_required
-def profile():
-    """User profile"""
-    from models import Order, CommunityPost, PostAnswer
-    
-    # Get user statistics
-    total_orders = Order.query.filter_by(user_id=current_user.id).count()
-    total_posts = CommunityPost.query.filter_by(user_id=current_user.id).count()
-    total_answers = PostAnswer.query.filter_by(user_id=current_user.id).count()
-    
-    # Get recent activity
-    recent_orders = Order.query.filter_by(user_id=current_user.id).order_by(
-        desc(Order.created_at)
-    ).limit(5).all()
-    
-    recent_posts = CommunityPost.query.filter_by(user_id=current_user.id).order_by(
-        desc(CommunityPost.created_at)
-    ).limit(5).all()
-    
-    return render_template('profile.html',
-                         total_orders=total_orders,
-                         total_posts=total_posts,
-                         total_answers=total_answers,
-                         recent_orders=recent_orders,
-                         recent_posts=recent_posts)
-
 # ==================== ERROR HANDLERS ====================
 
 @app.errorhandler(404)
@@ -732,22 +533,11 @@ def internal_error(error):
     db.session.rollback()
     return render_template('errors/500.html'), 500
 
-# ==================== FILE UPLOADS ====================
-
-@app.route('/uploads/<path:filename>')
-def uploaded_files(filename):
-    """Serve uploaded files"""
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
 # ==================== APPLICATION STARTUP ====================
 
 def startup():
     """Application startup procedure"""
     print("🚀 Starting AgriConnect Application...")
-    
-    # Create upload directories
-    os.makedirs('uploads/products', exist_ok=True)
-    os.makedirs('uploads/profiles', exist_ok=True)
     
     # Initialize database
     print("🔧 Initializing database...")
