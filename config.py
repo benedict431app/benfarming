@@ -5,7 +5,7 @@ load_dotenv()
 
 class Config:
     # Security
-    SECRET_KEY = os.getenv('SECRET_KEY', os.getenv('SESSION_SECRET', 'dev-secret-key-change-in-production'))
+    SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
     
     # Database - Use PostgreSQL on Render, SQLite locally
     if os.environ.get('RENDER'):
@@ -28,19 +28,19 @@ class Config:
         os.makedirs(UPLOAD_FOLDER)
     
     # API Keys
-    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-    PERENUAL_API_KEY = os.getenv('PERENUAL_API_KEY')
-    OPENWEATHER_API_KEY = os.getenv('OPENWEATHER_API_KEY')
-    PLANTID_API_KEY = os.getenv('PLANTID_API_KEY')
-    WEGLOT_API_KEY = os.getenv('WEGLOT_API_KEY')
-    COHERE_API_KEY = os.getenv('COHERE_API_KEY')
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+    PERENUAL_API_KEY = os.getenv('PERENUAL_API_KEY', '')
+    OPENWEATHER_API_KEY = os.getenv('OPENWEATHER_API_KEY', '')
+    PLANTID_API_KEY = os.getenv('PLANTID_API_KEY', '')
+    WEGLOT_API_KEY = os.getenv('WEGLOT_API_KEY', '')
+    COHERE_API_KEY = os.getenv('COHERE_API_KEY', '')
     
     # Email configuration
     SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
     SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
-    SMTP_USERNAME = os.getenv('SMTP_USERNAME')
-    SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
+    SMTP_USERNAME = os.getenv('SMTP_USERNAME', '')
+    SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '')
     
     # Flask configuration
     PREFERRED_URL_SCHEME = 'https' if os.environ.get('RENDER') else 'http'
