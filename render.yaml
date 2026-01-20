@@ -20,3 +20,10 @@ databases:
 "    databaseName: benfarming" 
 "    plan: free" 
 "    region: oregon" 
+
+services:
+  - type: web
+    name: agriconnect
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
