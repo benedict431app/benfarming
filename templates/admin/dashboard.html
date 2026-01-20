@@ -1,184 +1,309 @@
-{% extends "components/base.html" %}
-
-{% block title %}Admin Dashboard - Adiseware{% endblock %}
-
+{% extends "base.html" %}
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h1 class="mb-4">Admin Dashboard</h1>
-        
-        <!-- Stats Cards -->
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white shadow">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="card-title">Total Users</h6>
-                                <h2 class="mb-0">{{ stats.total_users }}</h2>
-                            </div>
-                            <i class="fas fa-users fa-2x"></i>
-                        </div>
-                    </div>
+<div class="container-fluid">
+    <!-- Admin Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0"><i class="fas fa-crown me-2"></i>Admin Dashboard</h4>
                 </div>
-            </div>
-            
-            <div class="col-md-3">
-                <div class="card bg-success text-white shadow">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="card-title">Active Users</h6>
-                                <h2 class="mb-0">{{ stats.active_users }}</h2>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h5>Welcome, System Administrator</h5>
+                            <p class="mb-0">Manage users, content, and platform features</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="alert alert-warning">
+                                <small>
+                                    <i class="fas fa-shield-alt me-1"></i>
+                                    Admin Access Only
+                                </small>
                             </div>
-                            <i class="fas fa-user-check fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-3">
-                <div class="card bg-info text-white shadow">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="card-title">Total Posts</h6>
-                                <h2 class="mb-0">{{ stats.total_posts }}</h2>
-                            </div>
-                            <i class="fas fa-comments fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-3">
-                <div class="card bg-warning text-white shadow">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="card-title">Total Revenue</h6>
-                                <h2 class="mb-0">KES {{ "%.2f"|format(stats.total_revenue) }}</h2>
-                            </div>
-                            <i class="fas fa-money-bill-wave fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Recent Activity -->
-        <div class="row">
-            <div class="col-md-8">
-                <div class="card shadow">
-                    <div class="card-header">
-                        <h5 class="mb-0">Recent User Activity</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>User</th>
-                                        <th>Email</th>
-                                        <th>Type</th>
-                                        <th>Last Login</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for user in stats.recent_logins %}
-                                    <tr>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                {% if user.profile_picture %}
-                                                <img src="{{ url_for('static', filename='uploads/' + user.profile_picture) }}" 
-                                                     class="rounded-circle me-2" width="30" height="30" alt="{{ user.full_name }}">
-                                                {% else %}
-                                                <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-2" 
-                                                     style="width: 30px; height: 30px;">
-                                                    <span class="text-white small">{{ user.full_name[0] }}</span>
-                                                </div>
-                                                {% endif %}
-                                                {{ user.full_name }}
-                                            </div>
-                                        </td>
-                                        <td>{{ user.email }}</td>
-                                        <td>
-                                            <span class="badge bg-secondary">{{ user.user_type|replace('_', ' ')|title }}</span>
-                                        </td>
-                                        <td>
-                                            {% if user.last_login %}
-                                            {{ user.last_login.strftime('%Y-%m-%d %H:%M') }}
-                                            {% else %}
-                                            <span class="text-muted">Never</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if user.is_active %}
-                                            <span class="badge bg-success">Active</span>
-                                            {% else %}
-                                            <span class="badge bg-danger">Inactive</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-4">
-                <div class="card shadow">
-                    <div class="card-header">
-                        <h5 class="mb-0">Quick Actions</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="d-grid gap-2">
-                            <a href="{{ url_for('admin_users') }}" class="btn btn-success">
-                                <i class="fas fa-users"></i> Manage Users
-                            </a>
-                            <a href="{{ url_for('view_recommendations') }}" class="btn btn-primary">
-                                <i class="fas fa-lightbulb"></i> View Suggestions
-                            </a>
-                            <a href="{{ url_for('community') }}" class="btn btn-info">
-                                <i class="fas fa-comments"></i> Monitor Community
-                            </a>
-                            <button class="btn btn-warning">
-                                <i class="fas fa-chart-bar"></i> View Reports
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="card shadow mt-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">System Status</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <small class="text-muted">Database</small>
-                            <div class="progress" style="height: 5px;">
-                                <div class="progress-bar bg-success" style="width: 25%"></div>
-                            </div>
-                            <small>25% used</small>
-                        </div>
-                        <div class="mb-3">
-                            <small class="text-muted">Storage</small>
-                            <div class="progress" style="height: 5px;">
-                                <div class="progress-bar bg-info" style="width: 60%"></div>
-                            </div>
-                            <small>60% used</small>
-                        </div>
-                        <div>
-                            <small class="text-muted">Active Sessions</small>
-                            <h4 class="mb-0">{{ stats.active_users }}</h4>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+    
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">Total Users</h6>
+                            <h2 class="mb-0">{{ stats.total_users }}</h2>
+                        </div>
+                        <div>
+                            <i class="fas fa-users fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">Active Users</h6>
+                            <h2 class="mb-0">{{ stats.active_users }}</h2>
+                        </div>
+                        <div>
+                            <i class="fas fa-user-check fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">Total Posts</h6>
+                            <h2 class="mb-0">{{ stats.total_posts }}</h2>
+                        </div>
+                        <div>
+                            <i class="fas fa-comments fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">Today's Logins</h6>
+                            <h2 class="mb-0">{{ stats.today_logins }}</h2>
+                        </div>
+                        <div>
+                            <i class="fas fa-sign-in-alt fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Admin Actions -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h6 class="mb-0"><i class="fas fa-cogs me-2"></i>Quick Actions</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_users') }}" class="btn btn-outline-primary w-100">
+                                <i class="fas fa-users me-2"></i>Manage Users
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_posts') }}" class="btn btn-outline-info w-100">
+                                <i class="fas fa-comments me-2"></i>Manage Posts
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_comments') }}" class="btn btn-outline-success w-100">
+                                <i class="fas fa-comment me-2"></i>Manage Comments
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_settings') }}" class="btn btn-outline-warning w-100">
+                                <i class="fas fa-sliders-h me-2"></i>Feature Settings
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Platform Statistics</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Total Orders</span>
+                            <span class="badge bg-primary">{{ stats.total_orders }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Total Revenue</span>
+                            <span class="badge bg-success">KES {{ "%.2f"|format(stats.total_revenue) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Disease Reports</span>
+                            <span class="badge bg-info">{{ stats.disease_reports }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>24/7 Support</span>
+                            <span class="text-success">
+                                <i class="fas fa-phone me-1"></i>+254 713 593 573
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Users -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h6 class="mb-0"><i class="fas fa-clock me-2"></i>Recent Users</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Type</th>
+                                    <th>Joined</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in stats.recent_users %}
+                                <tr>
+                                    <td>{{ user.id }}</td>
+                                    <td>{{ user.full_name }}</td>
+                                    <td>{{ user.email }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if user.user_type == 'farmer' else 'info' if user.user_type == 'agrovet' else 'warning' if user.user_type == 'extension_officer' else 'secondary' }}">
+                                            {{ user.user_type }}
+                                        </span>
+                                        {% if user.is_admin %}
+                                        <span class="badge bg-danger">Admin</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        {% if user.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            {% if not user.is_admin %}
+                                            <button class="btn btn-outline-success btn-sm toggle-user" 
+                                                    data-user-id="{{ user.id }}"
+                                                    data-action="{{ 'deactivate' if user.is_active else 'activate' }}">
+                                                <i class="fas fa-{{ 'ban' if user.is_active else 'check' }}"></i>
+                                            </button>
+                                            {% endif %}
+                                            {% if user.id != current_user.id %}
+                                            <button class="btn btn-outline-danger btn-sm delete-user" 
+                                                    data-user-id="{{ user.id }}">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card-header {
+    border-bottom: none;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+}
+</style>
+
+<script>
+$(document).ready(function() {
+    // Toggle user status
+    $('.toggle-user').on('click', function() {
+        const userId = $(this).data('user-id');
+        const action = $(this).data('action');
+        
+        if (!confirm(`Are you sure you want to ${action} this user?`)) {
+            return;
+        }
+        
+        $.ajax({
+            url: `/admin/user/${userId}/toggle`,
+            type: 'POST',
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                }
+            },
+            error: function() {
+                alert('Error updating user status');
+            }
+        });
+    });
+    
+    // Delete user
+    $('.delete-user').on('click', function() {
+        const userId = $(this).data('user-id');
+        
+        if (!confirm('Are you sure you want to deactivate this user? This action cannot be undone.')) {
+            return;
+        }
+        
+        $.ajax({
+            url: `/admin/user/${userId}/delete`,
+            type: 'POST',
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    alert(response.error || 'Error deleting user');
+                }
+            },
+            error: function() {
+                alert('Error deleting user');
+            }
+        });
+    });
+    
+    // Emergency contact
+    $('a[href*="tel:+254"]').on('click', function() {
+        console.log('Admin: Emergency contact initiated');
+    });
+});
+</script>
 {% endblock %}
