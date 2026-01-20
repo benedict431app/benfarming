@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0"><i class="fas fa-camera me-2"></i>Plant Disease Scanner</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Instructions -->
+                    <div class="alert alert-info mb-4">
+                        <h5><i class="fas fa-info-circle me-2"></i>How to get the best results:</h5>
+                        <ol class="mb-0">
+                            <li>Take a clear, well-lit photo of the affected plant part</li>
+                            <li>Focus on leaves, stems, or fruits showing symptoms</li>
+                            <li>Include both healthy and affected areas if possible</li>
+                            <li>Upload JPG, PNG, or GIF images (max 10MB)</li>
+                            <li>Our AI will detect if it's a plant and analyze it</li>
+                        </ol>
+                    </div>
+                    
+                    <!-- Contact Support -->
+                    <div class="alert alert-warning mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1"><i class="fas fa-headset me-2"></i>Need Help with Plant Issues?</h6>
+                                <p class="mb-0">Contact our agricultural experts 24/7</p>
+                            </div>
+                            <div>
+                                <a href="tel:+254713593573" class="btn btn-sm btn-danger me-2">
+                                    <i class="fas fa-phone me-1"></i> Emergency Call
+                                </a>
+                                <a href="https://wa.me/254713593573" target="_blank" class="btn btn-sm btn-success">
+                                    <i class="fab fa-whatsapp me-1"></i> WhatsApp Expert
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Upload Form -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <form id="scanForm" enctype="multipart/form-data">
+                                <div class="mb-3">
+                                    <label for="plant_image" class="form-label">Upload Plant Image</label>
+                                    <input type="file" class="form-control" id="plant_image" name="plant_image" accept="image/*" required>
+                                    <div class="form-text">Max file size: 10MB</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="description" class="form-label">Describe the Problem (Optional)</label>
+                                    <textarea class="form-control" id="description" name="description" rows="3" 
+                                              placeholder="E.g., Yellow spots on leaves, wilting stems, white powdery substance..."></textarea>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-success btn-lg w-100" id="scanBtn">
+                                    <i class="fas fa-search me-2"></i>Scan Plant
+                                </button>
+                                
+                                <div class="progress mt-3 d-none" id="progressBar">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                         role="progressbar" style="width: 0%"></div>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <!-- Image Preview -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Image Preview</h6>
+                                </div>
+                                <div class="card-body text-center">
+                                    <img id="imagePreview" src="" alt="Preview will appear here" 
+                                         class="img-fluid rounded d-none" style="max-height: 300px;">
+                                    <div id="noPreview" class="text-muted">
+                                        <i class="fas fa-image fa-3x mb-3"></i>
+                                        <p>No image selected</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Quick Tips -->
+                            <div class="card mt-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Quick Tips</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="mb-0">
+                                        <li>Early detection increases treatment success</li>
+                                        <li>Take photos from multiple angles</li>
+                                        <li>Include a coin or ruler for scale</li>
+                                        <li>Check weather conditions affecting plants</li>
+                                        <li>Record when symptoms first appeared</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Results Section -->
+                    <div id="resultsSection" class="mt-4 d-none">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>Analysis Results</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="plantCheck" class="alert d-none">
+                                    <h5><i class="fas fa-seedling me-2"></i>Plant Detection</h5>
+                                    <p id="plantMessage"></p>
+                                </div>
+                                
+                                <div id="analysisResults" class="d-none">
+                                    <h5><i class="fas fa-microscope me-2"></i>Detailed Analysis</h5>
+                                    <div class="alert alert-success">
+                                        <h6><i class="fas fa-chart-line me-2"></i>Confidence Level</h6>
+                                        <p id="confidenceLevel" class="fw-bold"></p>
+                                    </div>
+                                    <div id="analysisContent" class="analysis-content"></div>
+                                    
+                                    <div class="mt-3">
+                                        <a href="#" id="viewReportBtn" class="btn btn-success">
+                                            <i class="fas fa-file-medical me-2"></i>View Full Report
+                                        </a>
+                                        <button onclick="window.location.reload()" class="btn btn-outline-secondary ms-2">
+                                            <i class="fas fa-redo me-2"></i>Scan Another
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Processing Modal -->
+<div class="modal fade" id="processingModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-spinner fa-spin me-2"></i>Analyzing Plant</h5>
+            </div>
+            <div class="modal-body text-center">
+                <div class="mb-3">
+                    <i class="fas fa-seedling fa-4x text-success"></i>
+                </div>
+                <h5>Please wait...</h5>
+                <p>Our AI is analyzing your plant image. This may take 30-60 seconds.</p>
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         style="width: 100%"></div>
+                </div>
+                <p class="mt-3 small text-muted">
+                    <i class="fas fa-phone me-1"></i>
+                    Need immediate help? Call +254 713 593 573
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.analysis-content {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 15px;
+    white-space: pre-wrap;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+}
+
+.analysis-content h6 {
+    color: #28a745;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    border-bottom: 2px solid #28a745;
+    padding-bottom: 5px;
+}
+
+.analysis-content ul {
+    padding-left: 20px;
+}
+
+.analysis-content li {
+    margin-bottom: 5px;
+}
+</style>
+
+<script>
+$(document).ready(function() {
+    // Image preview
+    $('#plant_image').on('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                $('#imagePreview').attr('src', e.target.result).removeClass('d-none');
+                $('#noPreview').addClass('d-none');
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+    
+    // Form submission
+    $('#scanForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const scanBtn = $('#scanBtn');
+        const progressBar = $('#progressBar');
+        
+        // Show processing modal
+        $('#processingModal').modal('show');
+        
+        // Disable button and show progress
+        scanBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Scanning...');
+        progressBar.removeClass('d-none');
+        
+        // Animate progress bar
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += 5;
+            $('.progress-bar').css('width', progress + '%');
+            if (progress >= 90) clearInterval(progressInterval);
+        }, 300);
+        
+        // Send request
+        $.ajax({
+            url: "{{ url_for('plant_scan') }}",
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                clearInterval(progressInterval);
+                $('.progress-bar').css('width', '100%');
+                
+                setTimeout(() => {
+                    $('#processingModal').modal('hide');
+                    
+                    if (response.success) {
+                        // Show results
+                        $('#resultsSection').removeClass('d-none');
+                        
+                        // Plant detection message
+                        $('#plantCheck').removeClass('d-none').addClass('alert-success');
+                        $('#plantMessage').html(`
+                            <i class="fas fa-check-circle me-2"></i>
+                            Plant detected with ${response.confidence} confidence
+                        `);
+                        
+                        // Analysis results
+                        $('#analysisResults').removeClass('d-none');
+                        $('#confidenceLevel').text(`Detection Confidence: ${response.confidence}`);
+                        $('#analysisContent').html(formatAnalysis(response.analysis));
+                        
+                        // Set report link
+                        $('#viewReportBtn').attr('href', `/disease-report/${response.report_id}`);
+                        
+                    } else {
+                        // Show error
+                        $('#resultsSection').removeClass('d-none');
+                        $('#plantCheck').removeClass('d-none').addClass('alert-danger');
+                        $('#plantMessage').html(`
+                            <i class="fas fa-times-circle me-2"></i>
+                            ${response.error || 'Analysis failed'}
+                            ${response.message ? '<br><small>' + response.message + '</small>' : ''}
+                        `);
+                    }
+                    
+                    // Reset button
+                    scanBtn.prop('disabled', false).html('<i class="fas fa-search me-2"></i>Scan Plant');
+                    progressBar.addClass('d-none');
+                    $('.progress-bar').css('width', '0%');
+                    
+                }, 500);
+                
+            },
+            error: function(xhr) {
+                clearInterval(progressInterval);
+                $('#processingModal').modal('hide');
+                
+                $('#resultsSection').removeClass('d-none');
+                $('#plantCheck').removeClass('d-none').addClass('alert-danger');
+                $('#plantMessage').html(`
+                    <i class="fas fa-times-circle me-2"></i>
+                    Server error. Please try again or contact support.
+                `);
+                
+                scanBtn.prop('disabled', false).html('<i class="fas fa-search me-2"></i>Scan Plant');
+                progressBar.addClass('d-none');
+                $('.progress-bar').css('width', '0%');
+                
+                console.error('Scan error:', xhr.responseText);
+            }
+        });
+    });
+    
+    // Format analysis text
+    function formatAnalysis(text) {
+        // Add HTML formatting to the analysis text
+        let formatted = text
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/\n/g, '<br>')
+            .replace(/\d+\.\s+/g, '<h6>$&</h6>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>');
+        
+        return `<p>${formatted}</p>`;
+    }
+    
+    // Emergency contact tracking
+    $('a[href*="tel:+254"]').on('click', function() {
+        console.log('Emergency contact initiated');
+    });
+});
+</script>
+{% endblock %}
