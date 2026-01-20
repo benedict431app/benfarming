@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Service Unavailable - AgriConnect{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto text-center">
+        <div class="card">
+            <div class="card-body py-5">
+                <div class="display-1 text-muted mb-4">
+                    <i class="fas fa-plug text-warning"></i> 502
+                </div>
+                <h1 class="mb-3">Service Temporarily Unavailable</h1>
+                <p class="lead mb-4">
+                    Our servers are currently undergoing maintenance or experiencing high traffic. Please try again in a few minutes.
+                </p>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-clock me-2"></i>
+                    <strong>Estimated Time:</strong> Service should be restored within 5-10 minutes.
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5><i class="fas fa-sync-alt text-info me-2"></i>Refresh</h5>
+                                <p>Try refreshing the page in a moment.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5><i class="fas fa-history text-warning me-2"></i>Wait</h5>
+                                <p>Wait a few minutes and try again.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5><i class="fas fa-phone text-success me-2"></i>Contact</h5>
+                                <p>Call us if the problem persists.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-center mt-4">
+                    <button onclick="location.reload()" class="btn btn-primary">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh Page
+                    </button>
+                    <a href="tel:+254713593573" class="btn btn-success">
+                        <i class="fas fa-phone me-1"></i> Emergency Support
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
