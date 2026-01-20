@@ -17,15 +17,38 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import json
 
+
+
+import os
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_file, send_from_directory
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from werkzeug.utils import secure_filename
+from datetime import datetime, timedelta
+import requests
+import secrets
+import uuid
+from config import Config
+
+# Import db first, then models
+from flask_sqlalchemy import SQLAlchemy
+db = SQLAlchemy()
+
+# Now import models AFTER db is initialized
+from models import User, InventoryItem, Customer, Sale, SaleItem, Communication, DiseaseReport, Notification, WeatherData, CommunityPost, PostComment, PostFollow, UserReview, AppRecommendation, CartItem, Order, OrderItem, PasswordResetToken, Message
+
+import google.generativeai as genai
+from PIL import Image
+import io
+import base64
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import json
+
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Force PostgreSQL URL format for Render
-if os.environ.get('RENDER'):
-    database_url = app.config['SQLALCHEMY_DATABASE_URI']
-    if database_url and database_url.startswith('postgres://'):
-        app.config['SQLALCHEMY_DATABASE_URI'] = database_url.replace('postgres://', 'postgresql://', 1)
-
+# Initialize db with app
 db.init_app(app)
 
 # Initialize login manager
