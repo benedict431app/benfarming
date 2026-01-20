@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Posts - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0"><i class="fas fa-newspaper me-2"></i>Manage Community Posts</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Title</th>
+                                    <th>Author</th>
+                                    <th>Type</th>
+                                    <th>Category</th>
+                                    <th>Views</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for post in posts %}
+                                <tr>
+                                    <td>{{ post.id }}</td>
+                                    <td>
+                                        <a href="{{ url_for('view_post', post_id=post.id) }}" target="_blank">
+                                            {{ post.title|truncate(50) }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% if post.author.profile_picture %}
+                                            <img src="{{ post.author|profile_picture }}" alt="{{ post.author.full_name }}" 
+                                                 class="profile-picture-sm me-2">
+                                        {% endif %}
+                                        {{ post.author.full_name }}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ post.post_type }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ post.category }}</span>
+                                    </td>
+                                    <td>{{ post.views }}</td>
+                                    <td>{{ post.created_at|date }}</td>
+                                    <td>
+                                        {% if post.is_active %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Inactive</span>
+                                        {% endif %}
+                                        {% if post.is_featured %}
+                                            <span class="badge bg-warning">Featured</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('admin_edit_post', post_id=post.id) }}" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button class="btn btn-sm btn-outline-danger delete-post" 
+                                                    data-post-id="{{ post.id }}"
+                                                    data-post-title="{{ post.title }}">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                            <form action="{{ url_for('admin_delete_post', post_id=post.id) }}" 
+                                                  method="POST" class="d-none" id="delete-form-{{ post.id }}">
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {% if not posts %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-newspaper fa-3x text-muted mb-3"></i>
+                        <h4>No posts found</h4>
+                        <p class="text-muted">There are no community posts yet.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle post deletion
+    document.querySelectorAll('.delete-post').forEach(button => {
+        button.addEventListener('click', function() {
+            const postId = this.getAttribute('data-post-id');
+            const postTitle = this.getAttribute('data-post-title');
+            
+            if (confirm(`Are you sure you want to delete post: "${postTitle}"? This action cannot be undone.`)) {
+                const form = document.getElementById(`delete-form-${postId}`);
+                
+                fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error deleting post: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error deleting post');
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
