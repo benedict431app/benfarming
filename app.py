@@ -6,50 +6,32 @@ from datetime import datetime, timedelta
 import requests
 import secrets
 import uuid
-from config import Config
-from models import db, User, InventoryItem, Customer, Sale, SaleItem, Communication, DiseaseReport, Notification, WeatherData, CommunityPost, PostComment, PostFollow, UserReview, AppRecommendation, CartItem, Order, OrderItem, PasswordResetToken, Message
-import google.generativeai as genai
+import json
 from PIL import Image
 import io
 import base64
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import json
 
-
-
-import os
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_file, send_from_directory
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from werkzeug.utils import secure_filename
-from datetime import datetime, timedelta
-import requests
-import secrets
-import uuid
+# Import config first
 from config import Config
 
-# Import db first, then models
-from flask_sqlalchemy import SQLAlchemy
-db = SQLAlchemy()
-
-# Now import models AFTER db is initialized
-from models import User, InventoryItem, Customer, Sale, SaleItem, Communication, DiseaseReport, Notification, WeatherData, CommunityPost, PostComment, PostFollow, UserReview, AppRecommendation, CartItem, Order, OrderItem, PasswordResetToken, Message
-
-import google.generativeai as genai
-from PIL import Image
-import io
-import base64
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-import json
-
+# Create Flask app FIRST
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Initialize db with app
-db.init_app(app)
+# Initialize extensions
+from flask_sqlalchemy import SQLAlchemy
+db = SQLAlchemy(app)
+
+from models import User, InventoryItem, Customer, Sale, SaleItem, Communication, DiseaseReport, Notification, WeatherData, CommunityPost, PostComment, PostFollow, UserReview, AppRecommendation, CartItem, Order, OrderItem, PasswordResetToken, Message
+
+# Force PostgreSQL URL format for Render
+if os.environ.get('RENDER'):
+    database_url = app.config['SQLALCHEMY_DATABASE_URI']
+    if database_url and database_url.startswith('postgres://'):
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url.replace('postgres://', 'postgresql://', 1)
 
 # Initialize login manager
 login_manager = LoginManager()
@@ -136,7 +118,38 @@ with app.app_context():
         user_admin.set_password('12345678')
         db.session.add(user_admin)
     
+    # Create test farmer
+    if not User.query.filter_by(email='farmer@test.com').first():
+        farmer = User(
+            email='farmer@test.com',
+            full_name='Test Farmer',
+            user_type='farmer',
+            phone_number='+254700000001',
+            location='Nairobi'
+        )
+        farmer.set_password('password123')
+        db.session.add(farmer)
+    
+    # Create test agrovet
+    if not User.query.filter_by(email='agrovet@test.com').first():
+        agrovet = User(
+            email='agrovet@test.com',
+            full_name='Test Agrovet',
+            user_type='agrovet',
+            phone_number='+254700000002',
+            location='Nairobi'
+        )
+        agrovet.set_password('password123')
+        db.session.add(agrovet)
+    
     db.session.commit()
+
+# ========== HELPER FUNCTIONS ==========
+
+def get_unread_notification_count():
+    if not current_user.is_authenticated:
+        return 0
+    return Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
 
 # ========== ADD ALL MISSING ROUTES ==========
 
@@ -154,41 +167,50 @@ def index():
             return redirect(url_for('officer_dashboard'))
         elif current_user.user_type == 'learning_institution':
             return redirect(url_for('institution_dashboard'))
-        elif current_user.user_type == 'admin':
+        elif current_user.user_type == 'admin' or current_user.is_admin:
             return redirect(url_for('admin_dashboard'))
-    return render_template('index.html')
+    
+    return render_template('index.html', unread_count=0)
 
 @app.route('/about')
 def about():
-    return render_template('about.html')
+    unread_count = get_unread_notification_count() if current_user.is_authenticated else 0
+    return render_template('about.html', unread_count=unread_count)
 
 @app.route('/features')
 def features():
-    return render_template('features.html')
+    unread_count = get_unread_notification_count() if current_user.is_authenticated else 0
+    return render_template('features.html', unread_count=unread_count)
 
 @app.route('/contact')
 def contact():
-    return render_template('contact.html')
+    unread_count = get_unread_notification_count() if current_user.is_authenticated else 0
+    return render_template('contact.html', unread_count=unread_count)
 
 @app.route('/faq')
 def faq():
-    return render_template('faq.html')
+    unread_count = get_unread_notification_count() if current_user.is_authenticated else 0
+    return render_template('faq.html', unread_count=unread_count)
 
 @app.route('/privacy')
 def privacy():
-    return render_template('privacy.html')
+    unread_count = get_unread_notification_count() if current_user.is_authenticated else 0
+    return render_template('privacy.html', unread_count=unread_count)
 
 @app.route('/terms')
 def terms():
-    return render_template('terms.html')
+    unread_count = get_unread_notification_count() if current_user.is_authenticated else 0
+    return render_template('terms.html', unread_count=unread_count)
 
 @app.route('/pricing')
 def pricing():
-    return render_template('pricing.html')
+    unread_count = get_unread_notification_count() if current_user.is_authenticated else 0
+    return render_template('pricing.html', unread_count=unread_count)
 
 @app.route('/help')
 def help():
-    return render_template('help.html')
+    unread_count = get_unread_notification_count() if current_user.is_authenticated else 0
+    return render_template('help.html', unread_count=unread_count)
 
 # ========== AUTHENTICATION ROUTES ==========
 
@@ -235,7 +257,7 @@ def register():
         flash('Registration successful! Please login.', 'success')
         return redirect(url_for('login'))
     
-    return render_template('auth/register.html')
+    return render_template('auth/register.html', unread_count=0)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -256,11 +278,24 @@ def login():
             db.session.commit()
             
             flash('Login successful!', 'success')
-            return redirect(url_for('index'))
+            
+            # Redirect based on user type
+            if user.user_type == 'farmer':
+                return redirect(url_for('farmer_dashboard'))
+            elif user.user_type == 'agrovet':
+                return redirect(url_for('agrovet_dashboard'))
+            elif user.user_type == 'extension_officer':
+                return redirect(url_for('officer_dashboard'))
+            elif user.user_type == 'learning_institution':
+                return redirect(url_for('institution_dashboard'))
+            elif user.is_admin:
+                return redirect(url_for('admin_dashboard'))
+            else:
+                return redirect(url_for('index'))
         else:
             flash('Invalid email or password', 'error')
     
-    return render_template('auth/login.html')
+    return render_template('auth/login.html', unread_count=0)
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
@@ -285,7 +320,8 @@ def forgot_password():
         else:
             flash('Email not found', 'error')
     
-    return render_template('auth/forgot_password.html')
+    unread_count = get_unread_notification_count() if current_user.is_authenticated else 0
+    return render_template('auth/forgot_password.html', unread_count=unread_count)
 
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
@@ -311,7 +347,8 @@ def reset_password(token):
         flash('Password reset successful! Please login.', 'success')
         return redirect(url_for('login'))
     
-    return render_template('auth/reset_password.html', token=token)
+    unread_count = get_unread_notification_count() if current_user.is_authenticated else 0
+    return render_template('auth/reset_password.html', token=token, unread_count=unread_count)
 
 @app.route('/logout')
 @login_required
@@ -327,8 +364,9 @@ def logout():
 def profile():
     reviews = UserReview.query.filter_by(user_id=current_user.id, is_approved=True).all()
     recent_posts = CommunityPost.query.filter_by(author_id=current_user.id).order_by(CommunityPost.created_at.desc()).limit(5).all()
+    unread_count = get_unread_notification_count()
     
-    return render_template('profile.html', reviews=reviews, recent_posts=recent_posts)
+    return render_template('profile.html', reviews=reviews, recent_posts=recent_posts, unread_count=unread_count)
 
 @app.route('/uploads/<path:filename>')
 def serve_upload(filename):
@@ -355,7 +393,8 @@ def edit_profile():
         flash('Profile updated successfully!', 'success')
         return redirect(url_for('profile'))
     
-    return render_template('edit_profile.html')
+    unread_count = get_unread_notification_count()
+    return render_template('edit_profile.html', unread_count=unread_count)
 
 @app.route('/change-password', methods=['POST'])
 @login_required
@@ -390,7 +429,8 @@ def community():
         page=page, per_page=per_page, error_out=False
     )
     
-    return render_template('community/posts.html', posts=posts)
+    unread_count = get_unread_notification_count()
+    return render_template('community/posts.html', posts=posts, unread_count=unread_count)
 
 @app.route('/community/create', methods=['GET', 'POST'])
 @login_required
@@ -424,7 +464,8 @@ def create_post():
         flash('Post created successfully!', 'success')
         return redirect(url_for('view_post', post_id=post.id))
     
-    return render_template('community/create_post.html')
+    unread_count = get_unread_notification_count()
+    return render_template('community/create_post.html', unread_count=unread_count)
 
 @app.route('/community/post/<int:post_id>')
 @login_required
@@ -434,8 +475,9 @@ def view_post(post_id):
     db.session.commit()
     
     is_following = PostFollow.query.filter_by(post_id=post_id, user_id=current_user.id).first() is not None
+    unread_count = get_unread_notification_count()
     
-    return render_template('community/view_post.html', post=post, is_following=is_following)
+    return render_template('community/view_post.html', post=post, is_following=is_following, unread_count=unread_count)
 
 @app.route('/community/post/<int:post_id>/follow', methods=['POST'])
 @login_required
@@ -506,7 +548,8 @@ def admin_posts():
         return redirect(url_for('index'))
     
     posts = CommunityPost.query.order_by(CommunityPost.created_at.desc()).all()
-    return render_template('admin/posts.html', posts=posts)
+    unread_count = get_unread_notification_count()
+    return render_template('admin/posts.html', posts=posts, unread_count=unread_count)
 
 @app.route('/admin/post/<int:post_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -528,7 +571,8 @@ def admin_edit_post(post_id):
         flash('Post updated successfully!', 'success')
         return redirect(url_for('admin_posts'))
     
-    return render_template('admin/edit_post.html', post=post)
+    unread_count = get_unread_notification_count()
+    return render_template('admin/edit_post.html', post=post, unread_count=unread_count)
 
 @app.route('/admin/post/<int:post_id>/delete', methods=['POST'])
 @login_required
@@ -564,7 +608,8 @@ def browse_products():
     for product_name in product_groups:
         product_groups[product_name].sort(key=lambda x: x.price)
     
-    return render_template('products/browse.html', product_groups=product_groups)
+    unread_count = get_unread_notification_count()
+    return render_template('products/browse.html', product_groups=product_groups, unread_count=unread_count)
 
 @app.route('/agrovets')
 @login_required
@@ -578,7 +623,8 @@ def browse_agrovets():
     
     agrovets = agrovets.all()
     
-    return render_template('products/agrovets.html', agrovets=agrovets)
+    unread_count = get_unread_notification_count()
+    return render_template('products/agrovets.html', agrovets=agrovets, unread_count=unread_count)
 
 @app.route('/agrovet/<int:agrovet_id>/products')
 @login_required
@@ -590,7 +636,8 @@ def agrovet_products(agrovet_id):
     
     products = InventoryItem.query.filter_by(agrovet_id=agrovet_id, quantity__gt=0).all()
     
-    return render_template('products/agrovet_products.html', agrovet=agrovet, products=products)
+    unread_count = get_unread_notification_count()
+    return render_template('products/agrovet_products.html', agrovet=agrovet, products=products, unread_count=unread_count)
 
 @app.route('/cart')
 @login_required
@@ -598,7 +645,8 @@ def view_cart():
     cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
     total = sum(item.product.price * item.quantity for item in cart_items)
     
-    return render_template('products/cart.html', cart_items=cart_items, total=total)
+    unread_count = get_unread_notification_count()
+    return render_template('products/cart.html', cart_items=cart_items, total=total, unread_count=unread_count)
 
 @app.route('/cart/add/<int:product_id>', methods=['POST'])
 @login_required
@@ -752,12 +800,14 @@ def checkout():
         agrovet_totals[agrovet.id]['items'].append(cart_item)
         agrovet_totals[agrovet.id]['total'] += item_total
     
-    return render_template('products/checkout.html', agrovet_totals=agrovet_totals)
+    unread_count = get_unread_notification_count()
+    return render_template('products/checkout.html', agrovet_totals=agrovet_totals, unread_count=unread_count)
 
 @app.route('/order-confirmation')
 @login_required
 def order_confirmation():
-    return render_template('products/order_confirmation.html')
+    unread_count = get_unread_notification_count()
+    return render_template('products/order_confirmation.html', unread_count=unread_count)
 
 @app.route('/orders')
 @login_required
@@ -769,7 +819,8 @@ def my_orders():
     else:
         orders = []
     
-    return render_template('orders/list.html', orders=orders)
+    unread_count = get_unread_notification_count()
+    return render_template('orders/list.html', orders=orders, unread_count=unread_count)
 
 @app.route('/order/<int:order_id>')
 @login_required
@@ -784,7 +835,8 @@ def view_order(order_id):
         flash('Access denied', 'error')
         return redirect(url_for('my_orders'))
     
-    return render_template('orders/view.html', order=order)
+    unread_count = get_unread_notification_count()
+    return render_template('orders/view.html', order=order, unread_count=unread_count)
 
 @app.route('/agrovet/order/<int:order_id>')
 @login_required
@@ -799,7 +851,8 @@ def agrovet_order(order_id):
         flash('Access denied', 'error')
         return redirect(url_for('agrovet_dashboard'))
     
-    return render_template('agrovet/order.html', order=order)
+    unread_count = get_unread_notification_count()
+    return render_template('agrovet/order.html', order=order, unread_count=unread_count)
 
 # ========== MESSAGES ROUTES ==========
 
@@ -823,7 +876,8 @@ def messages():
         if not msg.is_read and msg.receiver_id == current_user.id:
             conversation_map[other_id]['unread_count'] += 1
     
-    return render_template('messages/list.html', conversations=conversation_map.values())
+    unread_count = get_unread_notification_count()
+    return render_template('messages/list.html', conversations=conversation_map.values(), unread_count=unread_count)
 
 @app.route('/messages/<int:user_id>', methods=['GET', 'POST'])
 @login_required
@@ -871,7 +925,8 @@ def chat_with_user(user_id):
         ((Message.sender_id == user_id) & (Message.receiver_id == current_user.id))
     ).order_by(Message.created_at.asc()).all()
     
-    return render_template('messages/chat.html', other_user=other_user, messages=messages)
+    unread_count = get_unread_notification_count()
+    return render_template('messages/chat.html', other_user=other_user, messages=messages, unread_count=unread_count)
 
 @app.route('/message/product/<int:product_id>', methods=['POST'])
 @login_required
@@ -902,7 +957,8 @@ def user_reviews(user_id):
     user = User.query.get_or_404(user_id)
     reviews = UserReview.query.filter_by(user_id=user_id, is_approved=True).all()
     
-    return render_template('reviews/user_reviews.html', user=user, reviews=reviews)
+    unread_count = get_unread_notification_count()
+    return render_template('reviews/user_reviews.html', user=user, reviews=reviews, unread_count=unread_count)
 
 @app.route('/reviews/add/<int:user_id>', methods=['POST'])
 @login_required
@@ -938,7 +994,8 @@ def add_review(user_id):
 @login_required
 def view_recommendations():
     recommendations = AppRecommendation.query.order_by(AppRecommendation.created_at.desc()).all()
-    return render_template('recommendations/list.html', recommendations=recommendations)
+    unread_count = get_unread_notification_count()
+    return render_template('recommendations/list.html', recommendations=recommendations, unread_count=unread_count)
 
 @app.route('/recommendations/add', methods=['GET', 'POST'])
 @login_required
@@ -961,7 +1018,8 @@ def add_recommendation():
         flash('Recommendation submitted! Thank you for your feedback.', 'success')
         return redirect(url_for('view_recommendations'))
     
-    return render_template('recommendations/add.html')
+    unread_count = get_unread_notification_count()
+    return render_template('recommendations/add.html', unread_count=unread_count)
 
 @app.route('/recommendations/<int:rec_id>/upvote', methods=['POST'])
 @login_required
@@ -990,7 +1048,8 @@ def admin_dashboard():
         'recent_logins': User.query.filter(User.last_login.isnot(None)).order_by(User.last_login.desc()).limit(10).all()
     }
     
-    return render_template('admin/dashboard.html', stats=stats)
+    unread_count = get_unread_notification_count()
+    return render_template('admin/dashboard.html', stats=stats, unread_count=unread_count)
 
 @app.route('/admin/users')
 @login_required
@@ -1000,7 +1059,8 @@ def admin_users():
         return redirect(url_for('index'))
     
     users = User.query.order_by(User.created_at.desc()).all()
-    return render_template('admin/users.html', users=users)
+    unread_count = get_unread_notification_count()
+    return render_template('admin/users.html', users=users, unread_count=unread_count)
 
 @app.route('/admin/user/<int:user_id>/toggle', methods=['POST'])
 @login_required
@@ -1048,7 +1108,7 @@ def detect_plant_disease(image_path, description=""):
     """Detect plant disease using AI analysis"""
     try:
         # If Cohere API is available, use it
-        if cohere_api_key:
+        if cohere_api_key and cohere_api_key != 'cohere-api-key-placeholder':
             headers = {
                 'Authorization': f'Bearer {cohere_api_key}',
                 'Content-Type': 'application/json',
@@ -1167,10 +1227,12 @@ def detect_disease():
                 if is_plant:
                     flash('Plant analysis completed successfully!', 'success')
                 
+                unread_count = get_unread_notification_count()
                 return render_template('farmer/disease_result.html', 
                                      report=report, 
                                      analysis=analysis,
-                                     image_url=url_for('serve_upload', filename=f'plant_disease/{filename}'))
+                                     image_url=url_for('serve_upload', filename=f'plant_disease/{filename}'),
+                                     unread_count=unread_count)
                 
             except Exception as e:
                 flash(f'Error processing image: {str(e)}', 'error')
@@ -1179,7 +1241,8 @@ def detect_disease():
         else:
             flash('Invalid file type. Please upload an image (PNG, JPG, JPEG)', 'error')
     
-    return render_template('farmer/detect_disease.html')
+    unread_count = get_unread_notification_count()
+    return render_template('farmer/detect_disease.html', unread_count=unread_count)
 
 @app.route('/farmer/disease-history')
 @login_required
@@ -1189,7 +1252,8 @@ def disease_history():
         return redirect(url_for('index'))
     
     reports = DiseaseReport.query.filter_by(farmer_id=current_user.id).order_by(DiseaseReport.created_at.desc()).all()
-    return render_template('farmer/disease_history.html', reports=reports)
+    unread_count = get_unread_notification_count()
+    return render_template('farmer/disease_history.html', reports=reports, unread_count=unread_count)
 
 @app.route('/farmer/weather')
 @login_required
@@ -1209,10 +1273,12 @@ def farmer_weather():
         forecast_response = requests.get(forecast_url)
         forecast_data = forecast_response.json()
         
-        return render_template('farmer/weather.html', weather=weather_data, forecast=forecast_data)
+        unread_count = get_unread_notification_count()
+        return render_template('farmer/weather.html', weather=weather_data, forecast=forecast_data, unread_count=unread_count)
     except Exception as e:
         flash(f'Error fetching weather data: {str(e)}', 'error')
-        return render_template('farmer/weather.html', weather=None, forecast=None)
+        unread_count = get_unread_notification_count()
+        return render_template('farmer/weather.html', weather=None, forecast=None, unread_count=unread_count)
 
 # FARMER DASHBOARD ROUTE
 @app.route('/farmer/dashboard')
@@ -1227,10 +1293,12 @@ def farmer_dashboard():
     
     recent_posts = CommunityPost.query.order_by(CommunityPost.created_at.desc()).limit(5).all()
     
+    unread_count = get_unread_notification_count()
     return render_template('farmer/dashboard.html', 
                          notifications=notifications, 
                          disease_reports=disease_reports,
-                         recent_posts=recent_posts)
+                         recent_posts=recent_posts,
+                         unread_count=unread_count)
 
 # AGROVET DASHBOARD ROUTE
 @app.route('/agrovet/dashboard')
@@ -1253,6 +1321,7 @@ def agrovet_dashboard():
     
     recent_orders = Order.query.filter_by(agrovet_id=current_user.id).order_by(Order.created_at.desc()).limit(5).all()
     
+    unread_count = get_unread_notification_count()
     return render_template('agrovet/dashboard.html', 
                          total_products=total_products,
                          low_stock_items=low_stock_items,
@@ -1260,7 +1329,8 @@ def agrovet_dashboard():
                          today_revenue=today_revenue,
                          recent_sales=recent_sales,
                          recent_orders=recent_orders,
-                         notifications=notifications)
+                         notifications=notifications,
+                         unread_count=unread_count)
 
 # Agrovet inventory routes
 @app.route('/agrovet/inventory')
@@ -1271,7 +1341,8 @@ def agrovet_inventory():
         return redirect(url_for('index'))
     
     items = InventoryItem.query.filter_by(agrovet_id=current_user.id).all()
-    return render_template('agrovet/inventory.html', items=items)
+    unread_count = get_unread_notification_count()
+    return render_template('agrovet/inventory.html', items=items, unread_count=unread_count)
 
 @app.route('/agrovet/inventory/add', methods=['GET', 'POST'])
 @login_required
@@ -1301,7 +1372,8 @@ def add_inventory():
         flash('Product added successfully!', 'success')
         return redirect(url_for('agrovet_inventory'))
     
-    return render_template('agrovet/add_inventory.html')
+    unread_count = get_unread_notification_count()
+    return render_template('agrovet/add_inventory.html', unread_count=unread_count)
 
 @app.route('/agrovet/inventory/edit/<int:item_id>', methods=['GET', 'POST'])
 @login_required
@@ -1332,7 +1404,8 @@ def edit_inventory(item_id):
         flash('Product updated successfully!', 'success')
         return redirect(url_for('agrovet_inventory'))
     
-    return render_template('agrovet/edit_inventory.html', item=item)
+    unread_count = get_unread_notification_count()
+    return render_template('agrovet/edit_inventory.html', item=item, unread_count=unread_count)
 
 @app.route('/agrovet/inventory/delete/<int:item_id>', methods=['POST'])
 @login_required
@@ -1360,7 +1433,8 @@ def agrovet_pos():
     
     items = InventoryItem.query.filter_by(agrovet_id=current_user.id).filter(InventoryItem.quantity > 0).all()
     customers = Customer.query.filter_by(agrovet_id=current_user.id).all()
-    return render_template('agrovet/pos.html', items=items, customers=customers)
+    unread_count = get_unread_notification_count()
+    return render_template('agrovet/pos.html', items=items, customers=customers, unread_count=unread_count)
 
 @app.route('/agrovet/pos/checkout', methods=['POST'])
 @login_required
@@ -1446,17 +1520,18 @@ def ai_chat():
             return jsonify({'success': False, 'error': 'Message cannot be empty'})
         
         try:
-            headers = {
-                'Authorization': f'Bearer {cohere_api_key}',
-                'Content-Type': 'application/json',
-            }
-            
-            chat_payload = {
-                'model': 'c4ai-aya-expanse-8b',
-                'message': message,
-                'temperature': 0.7,
-                'max_tokens': 500,
-                'preamble': """You are AgriConnect AI Assistant, a helpful agricultural expert specializing in:
+            if cohere_api_key and cohere_api_key != 'cohere-api-key-placeholder':
+                headers = {
+                    'Authorization': f'Bearer {cohere_api_key}',
+                    'Content-Type': 'application/json',
+                }
+                
+                chat_payload = {
+                    'model': 'c4ai-aya-expanse-8b',
+                    'message': message,
+                    'temperature': 0.7,
+                    'max_tokens': 500,
+                    'preamble': """You are AgriConnect AI Assistant, a helpful agricultural expert specializing in:
 1. Farming techniques and best practices
 2. Crop management and disease control
 3. Livestock care and management
@@ -1470,22 +1545,39 @@ def ai_chat():
 
 Provide practical, actionable advice specific to Kenyan farming conditions.
 Be concise but thorough. If you don't know something, admit it and suggest consulting local extension officers."""
-            }
-            
-            response = requests.post('https://api.cohere.ai/v1/chat', json=chat_payload, headers=headers)
-            result = response.json()
-            
-            if response.status_code == 200 and 'text' in result:
-                ai_response = result['text']
+                }
+                
+                response = requests.post('https://api.cohere.ai/v1/chat', json=chat_payload, headers=headers)
+                result = response.json()
+                
+                if response.status_code == 200 and 'text' in result:
+                    ai_response = result['text']
+                    return jsonify({
+                        'success': True,
+                        'response': ai_response
+                    })
+                else:
+                    error_msg = result.get('message', 'Unable to process your request')
+                    return jsonify({
+                        'success': False,
+                        'error': f'AI Service error: {error_msg}'
+                    })
+            else:
+                # Simulate AI response when no API key
+                responses = [
+                    "Based on your question, I recommend checking the soil moisture levels first.",
+                    "For plant diseases, try neem oil as a natural fungicide.",
+                    "Make sure your plants get at least 6 hours of sunlight daily.",
+                    "Consider crop rotation to prevent soil depletion.",
+                    "Regular pruning helps improve air circulation and prevent diseases."
+                ]
+                
+                import random
+                ai_response = random.choice(responses)
+                
                 return jsonify({
                     'success': True,
-                    'response': ai_response
-                })
-            else:
-                error_msg = result.get('message', 'Unable to process your request')
-                return jsonify({
-                    'success': False,
-                    'error': f'AI Service error: {error_msg}'
+                    'response': f"[Demo Mode] {ai_response}\n\nNote: To get real AI responses, add your Cohere API key to the configuration."
                 })
             
         except Exception as e:
@@ -1494,7 +1586,8 @@ Be concise but thorough. If you don't know something, admit it and suggest consu
                 'error': f'Chat service error: {str(e)}'
             })
     
-    return render_template('ai_chat.html')
+    unread_count = get_unread_notification_count()
+    return render_template('ai_chat.html', unread_count=unread_count)
 
 @app.route('/api/chat', methods=['POST'])
 @login_required
@@ -1507,30 +1600,34 @@ def chat():
         return jsonify({'success': False, 'error': 'No message provided'})
     
     try:
-        headers = {
-            'Authorization': f'Bearer {cohere_api_key}',
-            'Content-Type': 'application/json',
-        }
-        
-        chat_payload = {
-            'model': 'c4ai-aya-expanse-8b',
-            'message': message,
-            'temperature': 0.7,
-            'max_tokens': 500,
-            'preamble': 'You are a helpful agricultural assistant specializing in farming, crops, livestock, and agricultural practices. Provide practical, concise advice to farmers.'
-        }
-        
-        response = requests.post('https://api.cohere.ai/v1/chat', json=chat_payload, headers=headers)
-        result = response.json()
-        
-        if response.status_code == 200 and 'text' in result:
-            ai_response = result['text']
+        if cohere_api_key and cohere_api_key != 'cohere-api-key-placeholder':
+            headers = {
+                'Authorization': f'Bearer {cohere_api_key}',
+                'Content-Type': 'application/json',
+            }
+            
+            chat_payload = {
+                'model': 'c4ai-aya-expanse-8b',
+                'message': message,
+                'temperature': 0.7,
+                'max_tokens': 500,
+                'preamble': 'You are a helpful agricultural assistant specializing in farming, crops, livestock, and agricultural practices. Provide practical, concise advice to farmers.'
+            }
+            
+            response = requests.post('https://api.cohere.ai/v1/chat', json=chat_payload, headers=headers)
+            result = response.json()
+            
+            if response.status_code == 200 and 'text' in result:
+                ai_response = result['text']
+            else:
+                error_msg = result.get('message', 'Unknown error from Cohere API')
+                return jsonify({
+                    'success': False,
+                    'error': f'Cohere API error: {error_msg}'
+                })
         else:
-            error_msg = result.get('message', 'Unknown error from Cohere API')
-            return jsonify({
-                'success': False,
-                'error': f'Cohere API error: {error_msg}'
-            })
+            # Fallback response
+            ai_response = "I'm your agricultural assistant. To get real AI responses, please configure your Cohere API key."
         
         return jsonify({
             'success': True,
@@ -1547,60 +1644,42 @@ def chat():
 @app.route('/test-api')
 def test_api():
     try:
-        headers = {
-            'Authorization': f'Bearer {cohere_api_key}',
-            'Content-Type': 'application/json',
-        }
-        
-        test_payload = {
-            'model': 'c4ai-aya-expanse-8b',
-            'message': 'Please respond with "API test successful" if you are working.',
-            'temperature': 0.7,
-            'max_tokens': 20
-        }
-        
-        response = requests.post('https://api.cohere.ai/v1/chat', json=test_payload, headers=headers)
-        result = response.json()
-        
-        if response.status_code == 200 and 'text' in result:
-            test_response = result['text']
-            return f"Cohere API is working! Response: {test_response}"
+        if cohere_api_key and cohere_api_key != 'cohere-api-key-placeholder':
+            headers = {
+                'Authorization': f'Bearer {cohere_api_key}',
+                'Content-Type': 'application/json',
+            }
+            
+            test_payload = {
+                'model': 'c4ai-aya-expanse-8b',
+                'message': 'Please respond with "API test successful" if you are working.',
+                'temperature': 0.7,
+                'max_tokens': 20
+            }
+            
+            response = requests.post('https://api.cohere.ai/v1/chat', json=test_payload, headers=headers)
+            result = response.json()
+            
+            if response.status_code == 200 and 'text' in result:
+                test_response = result['text']
+                return f"Cohere API is working! Response: {test_response}"
+            else:
+                error_msg = result.get('message', 'Unknown error')
+                return f"Cohere API error: {response.status_code} - {error_msg}"
         else:
-            error_msg = result.get('message', 'Unknown error')
-            return f"Cohere API error: {response.status_code} - {error_msg}"
+            return "Cohere API key not configured. Please add your API key to get real AI responses."
             
     except Exception as e:
         return f"Cohere API Error: {str(e)}"
-
-# List models route
-@app.route('/list-models')
-def list_models():
-    try:
-        headers = {
-            'Authorization': f'Bearer {cohere_api_key}',
-            'Content-Type': 'application/json',
-        }
-        
-        response = requests.get('https://api.cohere.ai/v1/models', headers=headers)
-        result = response.json()
-        
-        if response.status_code == 200:
-            models = result.get('models', [])
-            model_list = "\n".join([f"- {model['name']}" for model in models])
-            return f"Available Cohere models:\n{model_list}"
-        else:
-            return f"Error fetching models: {response.status_code} - {result}"
-            
-    except Exception as e:
-        return f"Error: {str(e)}"
 
 # ========== NOTIFICATION ROUTES ==========
 
 @app.route('/notifications')
 @login_required
 def notifications():
-    notifications = Notification.query.filter_by(user_id=current_user.id).order_by(Notification.created_at.desc()).all()
-    return render_template('notifications.html', notifications=notifications)
+    notifications_list = Notification.query.filter_by(user_id=current_user.id).order_by(Notification.created_at.desc()).all()
+    unread_count = get_unread_notification_count()
+    return render_template('notifications.html', notifications=notifications_list, unread_count=unread_count)
 
 @app.route('/notifications/mark-read/<int:notification_id>', methods=['POST'])
 @login_required
@@ -1618,9 +1697,9 @@ def mark_notification_read(notification_id):
 @app.route('/notifications/mark-all-read', methods=['POST'])
 @login_required
 def mark_all_notifications_read():
-    notifications = Notification.query.filter_by(user_id=current_user.id, is_read=False).all()
+    notifications_list = Notification.query.filter_by(user_id=current_user.id, is_read=False).all()
     
-    for notification in notifications:
+    for notification in notifications_list:
         notification.is_read = True
     
     db.session.commit()
@@ -1643,10 +1722,12 @@ def weather():
         forecast_response = requests.get(forecast_url)
         forecast_data = forecast_response.json()
         
-        return render_template('weather.html', weather=weather_data, forecast=forecast_data)
+        unread_count = get_unread_notification_count()
+        return render_template('weather.html', weather=weather_data, forecast=forecast_data, unread_count=unread_count)
     except Exception as e:
         flash(f'Error fetching weather data: {str(e)}', 'error')
-        return render_template('weather.html', weather=None, forecast=None)
+        unread_count = get_unread_notification_count()
+        return render_template('weather.html', weather=None, forecast=None, unread_count=unread_count)
 
 # ========== HEALTH CHECK ==========
 
@@ -1675,24 +1756,27 @@ def format_date(value):
 
 @app.template_filter('profile_picture')
 def get_profile_picture(user):
-    if user.profile_picture:
+    if user and user.profile_picture:
         return url_for('serve_upload', filename=f'profile_pictures/{user.profile_picture}')
-    return url_for('static', filename='images/default-profile.png')
+    return '/static/images/default-profile.png'
 
 # ========== ERROR HANDLERS ==========
 
 @app.errorhandler(404)
 def not_found_error(error):
-    return render_template('errors/404.html'), 404
+    unread_count = get_unread_notification_count() if current_user.is_authenticated else 0
+    return render_template('404.html', unread_count=unread_count), 404
 
 @app.errorhandler(500)
 def internal_error(error):
     db.session.rollback()
-    return render_template('errors/500.html'), 500
+    unread_count = get_unread_notification_count() if current_user.is_authenticated else 0
+    return render_template('500.html', unread_count=unread_count), 500
 
 @app.errorhandler(502)
 def bad_gateway_error(error):
-    return render_template('errors/502.html'), 502
+    unread_count = get_unread_notification_count() if current_user.is_authenticated else 0
+    return render_template('502.html', unread_count=unread_count), 502
 
 # Favicon
 @app.route('/favicon.ico')
