@@ -1,46 +1,101 @@
-import os
-from dotenv import load_dotenv
+{% extends "components/base.html" %}
 
-load_dotenv()
+{% block title %}Register - Adiseware{% endblock %}
 
-class Config:
-    # Security
-    SECRET_KEY = os.getenv('SECRET_KEY', os.getenv('SESSION_SECRET', 'dev-secret-key-change-in-production'))
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <div class="card shadow">
+            <div class="card-body p-5">
+                <h1 class="card-title text-center mb-4">Register for Adiseware</h1>
+                <form method="POST" action="{{ url_for('register') }}" enctype="multipart/form-data" novalidate>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="full_name" class="form-label">Full Name <span class="text-danger" aria-label="required">*</span></label>
+                            <input type="text" class="form-control" id="full_name" name="full_name" required 
+                                   aria-required="true" autocomplete="name">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">Email Address <span class="text-danger" aria-label="required">*</span></label>
+                            <input type="email" class="form-control" id="email" name="email" required 
+                                   aria-required="true" autocomplete="email">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="password" class="form-label">Password <span class="text-danger" aria-label="required">*</span></label>
+                            <input type="password" class="form-control" id="password" name="password" required 
+                                   aria-required="true" autocomplete="new-password">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="confirm_password" class="form-label">Confirm Password <span class="text-danger" aria-label="required">*</span></label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required 
+                                   aria-required="true" autocomplete="new-password">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="phone_number" class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" id="phone_number" name="phone_number" 
+                                   autocomplete="tel">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="user_type" class="form-label">Account Type <span class="text-danger" aria-label="required">*</span></label>
+                            <select class="form-select" id="user_type" name="user_type" required aria-required="true">
+                                <option value="">Select your role...</option>
+                                <option value="farmer">Farmer</option>
+                                <option value="agrovet">Agrovet</option>
+                                <option value="extension_officer">Extension Officer</option>
+                                <option value="learning_institution">Learning Institution</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="location" class="form-label">Location</label>
+                            <input type="text" class="form-control" id="location" name="location" 
+                                   placeholder="City, Country">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="profile_picture" class="form-label">Profile Picture</label>
+                        <input type="file" class="form-control" id="profile_picture" name="profile_picture" 
+                               accept="image/*" aria-describedby="profilePictureHelp">
+                        <div id="profilePictureHelp" class="form-text">Upload a clear profile photo (JPG, PNG, or GIF) - Optional</div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="fas fa-user-plus" aria-hidden="true"></i> Register
+                        </button>
+                    </div>
+                </form>
+                <div class="text-center mt-3">
+                    <p>Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>
+                    <p><a href="{{ url_for('forgot_password') }}">Forgot your password?</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('password').addEventListener('input', validatePassword);
+document.getElementById('confirm_password').addEventListener('input', validatePassword);
+
+function validatePassword() {
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirm_password');
     
-    # Database - Use PostgreSQL on Render, SQLite locally
-    if os.environ.get('RENDER'):
-        DATABASE_URL = os.environ.get('DATABASE_URL')
-        if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
-            DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-    else:
-        DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///database.db')
-    
-    SQLALCHEMY_DATABASE_URI = DATABASE_URL
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
-    # File uploads
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
-    
-    # Ensure upload folder exists
-    if not os.path.exists(UPLOAD_FOLDER):
-        os.makedirs(UPLOAD_FOLDER)
-    
-    # API Keys
-    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-    PERENUAL_API_KEY = os.getenv('PERENUAL_API_KEY')
-    OPENWEATHER_API_KEY = os.getenv('OPENWEATHER_API_KEY')
-    PLANTID_API_KEY = os.getenv('PLANTID_API_KEY')
-    WEGLOT_API_KEY = os.getenv('WEGLOT_API_KEY')
-    COHERE_API_KEY = os.getenv('COHERE_API_KEY')
-    
-    # Email configuration
-    SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-    SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
-    SMTP_USERNAME = os.getenv('SMTP_USERNAME')
-    SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
-    
-    # Flask configuration
-    PREFERRED_URL_SCHEME = 'https' if os.environ.get('RENDER') else 'http'
+    if (password.value !== confirmPassword.value) {
+        confirmPassword.setCustomValidity('Passwords do not match');
+    } else {
+        confirmPassword.setCustomValidity('');
+    }
+}
+</script>
+{% endblock %}
