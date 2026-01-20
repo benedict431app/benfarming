@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0"><i class="fas fa-file-medical me-2"></i>Plant Disease Report</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Report Summary -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h5><i class="fas fa-calendar me-2"></i>Report Date</h5>
+                                    <p class="mb-0">{{ report.created_at|datetime }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h5><i class="fas fa-chart-line me-2"></i>Confidence</h5>
+                                    <p class="mb-0">
+                                        <span class="badge bg-{{ 'success' if report.confidence > 0.7 else 'warning' if report.confidence > 0.4 else 'danger' }}">
+                                            {{ "%.1f"|format(report.confidence * 100) }}%
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h5><i class="fas fa-map-marker-alt me-2"></i>Location</h5>
+                                    <p class="mb-0">{{ report.location or 'Not specified' }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Plant Image -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-image me-2"></i>Plant Image</h6>
+                                </div>
+                                <div class="card-body text-center">
+                                    {% if report.plant_image %}
+                                    <img src="{{ url_for('static', filename='uploads/' + report.plant_image) }}" 
+                                         alt="Plant Image" class="img-fluid rounded" style="max-height: 400px;">
+                                    {% else %}
+                                    <div class="text-muted">
+                                        <i class="fas fa-image fa-3x mb-3"></i>
+                                        <p>No image available</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <!-- Description -->
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-edit me-2"></i>Description</h6>
+                                </div>
+                                <div class="card-body">
+                                    {% if report.plant_description %}
+                                    <p>{{ report.plant_description }}</p>
+                                    {% else %}
+                                    <p class="text-muted">No description provided</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <!-- Quick Actions -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-first-aid me-2"></i>Quick Actions</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-grid gap-2">
+                                        <a href="{{ url_for('ai_chat') }}" class="btn btn-success">
+                                            <i class="fas fa-robot me-2"></i>Ask AI for More Advice
+                                        </a>
+                                        <a href="tel:+254713593573" class="btn btn-danger">
+                                            <i class="fas fa-phone me-2"></i>Call Agricultural Expert
+                                        </a>
+                                        <a href="https://wa.me/254713593573" target="_blank" class="btn btn-success">
+                                            <i class="fab fa-whatsapp me-2"></i>WhatsApp with Photos
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Analysis Results -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="fas fa-microscope me-2"></i>AI Analysis Results</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="analysis-content">
+                                {{ report.treatment_recommendation|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Expert Contact -->
+                    <div class="alert alert-warning">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5><i class="fas fa-exclamation-triangle me-2"></i>Need Expert Verification?</h5>
+                                <p class="mb-0">Our agricultural officers can provide personalized advice</p>
+                            </div>
+                            <div>
+                                <a href="tel:+254713593573" class="btn btn-danger">
+                                    <i class="fas fa-phone me-2"></i> Call Expert Now
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Navigation -->
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('my_disease_reports') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Reports
+                        </a>
+                        <div>
+                            <a href="{{ url_for('plant_scan') }}" class="btn btn-success">
+                                <i class="fas fa-camera me-2"></i>Scan Another Plant
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.analysis-content {
+    white-space: pre-wrap;
+    line-height: 1.6;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.analysis-content h6 {
+    color: #28a745;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    border-bottom: 2px solid #28a745;
+    padding-bottom: 5px;
+}
+
+.analysis-content ul {
+    padding-left: 20px;
+}
+
+.analysis-content li {
+    margin-bottom: 5px;
+}
+</style>
+
+<script>
+$(document).ready(function() {
+    // Format analysis content
+    function formatAnalysis(text) {
+        return text
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/\n/g, '<br>')
+            .replace(/\d+\.\s+/g, '<h6>$&</h6>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>');
+    }
+    
+    // Format the analysis if needed
+    const analysisContent = $('.analysis-content');
+    analysisContent.html(formatAnalysis(analysisContent.html()));
+    
+    // Emergency contact tracking
+    $('a[href*="tel:+254"]').on('click', function() {
+        console.log('Disease Report: Expert contact initiated');
+    });
+});
+</script>
+{% endblock %}
