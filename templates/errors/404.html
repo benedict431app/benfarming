@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Page Not Found - AgriConnect{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto text-center">
+        <div class="card">
+            <div class="card-body py-5">
+                <div class="display-1 text-muted mb-4">
+                    <i class="fas fa-exclamation-triangle text-warning"></i> 404
+                </div>
+                <h1 class="mb-3">Page Not Found</h1>
+                <p class="lead mb-4">
+                    The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
+                </p>
+                <div class="row mt-5">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5><i class="fas fa-home text-primary me-2"></i>Go to Home</h5>
+                                <p class="card-text">Return to the main page and start from there.</p>
+                                <a href="{{ url_for('index') }}" class="btn btn-primary">
+                                    <i class="fas fa-home me-1"></i> Home
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5><i class="fas fa-headset text-success me-2"></i>Need Help?</h5>
+                                <p class="card-text">Contact our support team for assistance.</p>
+                                <a href="tel:+254713593573" class="btn btn-success">
+                                    <i class="fas fa-phone me-1"></i> Call Support
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
