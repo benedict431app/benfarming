@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0"><i class="fas fa-robot me-2"></i>Mkulima AI - Agricultural Assistant</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Introduction -->
+                    <div class="alert alert-info mb-4">
+                        <h5><i class="fas fa-graduation-cap me-2"></i>How Mkulima AI can help you:</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ul>
+                                    <li>Plant disease diagnosis</li>
+                                    <li>Crop selection advice</li>
+                                    <li>Soil improvement techniques</li>
+                                    <li>Pest control solutions</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <ul>
+                                    <li>Weather-based farming tips</li>
+                                    <li>Market price information</li>
+                                    <li>Sustainable farming practices</li>
+                                    <li>Government subsidy programs</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <p class="mb-0 mt-2">
+                            <strong>Note:</strong> For emergencies or complex issues, 
+                            <a href="tel:+254713593573">contact our human experts</a>
+                        </p>
+                    </div>
+                    
+                    <!-- Emergency Contact -->
+                    <div class="alert alert-warning mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1"><i class="fas fa-headset me-2"></i>Need Human Expert?</h6>
+                                <p class="mb-0">Our agricultural officers are available 24/7</p>
+                            </div>
+                            <div>
+                                <a href="tel:+254713593573" class="btn btn-sm btn-danger me-2">
+                                    <i class="fas fa-phone me-1"></i> Call Expert
+                                </a>
+                                <a href="https://wa.me/254713593573" target="_blank" class="btn btn-sm btn-success">
+                                    <i class="fab fa-whatsapp me-1"></i> WhatsApp
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Chat Interface -->
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="card chat-container">
+                                <div class="card-body">
+                                    <!-- Chat Messages -->
+                                    <div id="chatMessages" class="chat-messages" style="height: 400px; overflow-y: auto; padding: 15px;">
+                                        <!-- Messages will appear here -->
+                                        <div class="alert alert-light">
+                                            <p class="mb-0">
+                                                <strong>Mkulima AI:</strong> Hello! I'm Mkulima AI, your agricultural assistant. 
+                                                How can I help you with your farming today? You can ask about crops, diseases, 
+                                                weather, markets, or any farming-related topic.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Chat Input -->
+                                    <div class="chat-input mt-3">
+                                        <form id="chatForm">
+                                            <div class="input-group">
+                                                <input type="text" 
+                                                       id="messageInput" 
+                                                       class="form-control" 
+                                                       placeholder="Ask about crops, diseases, weather, markets..."
+                                                       autocomplete="off">
+                                                <button type="submit" class="btn btn-success" id="sendBtn">
+                                                    <i class="fas fa-paper-plane"></i>
+                                                </button>
+                                            </div>
+                                            <div class="form-text mt-2">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-lightbulb me-1"></i>
+                                                    Try: "What crops grow best in Nairobi?" or "How to treat tomato blight?"
+                                                </small>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Questions -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5><i class="fas fa-bolt me-2"></i>Quick Questions</h5>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button class="btn btn-outline-success quick-question">
+                                    Best crops for dry season
+                                </button>
+                                <button class="btn btn-outline-success quick-question">
+                                    Organic pest control
+                                </button>
+                                <button class="btn btn-outline-success quick-question">
+                                    Maize planting schedule
+                                </button>
+                                <button class="btn btn-outline-success quick-question">
+                                    Tomato diseases in Kenya
+                                </button>
+                                <button class="btn btn-outline-success quick-question">
+                                    Fertilizer recommendations
+                                </button>
+                                <button class="btn btn-outline-success quick-question">
+                                    Water conservation tips
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.chat-container {
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+}
+
+.chat-messages {
+    background-color: #f8f9fa;
+    border-radius: 10px;
+}
+
+.chat-message {
+    margin-bottom: 15px;
+    padding: 10px 15px;
+    border-radius: 15px;
+    max-width: 80%;
+}
+
+.user-message {
+    background-color: #28a745;
+    color: white;
+    margin-left: auto;
+    border-bottom-right-radius: 5px;
+}
+
+.ai-message {
+    background-color: white;
+    border: 1px solid #dee2e6;
+    margin-right: auto;
+    border-bottom-left-radius: 5px;
+}
+
+.quick-question:hover {
+    background-color: #28a745;
+    color: white;
+}
+
+#chatMessages::-webkit-scrollbar {
+    width: 8px;
+}
+
+#chatMessages::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+#chatMessages::-webkit-scrollbar-thumb {
+    background: #28a745;
+    border-radius: 4px;
+}
+
+#chatMessages::-webkit-scrollbar-thumb:hover {
+    background: #218838;
+}
+</style>
+
+<script>
+$(document).ready(function() {
+    const chatMessages = $('#chatMessages');
+    const messageInput = $('#messageInput');
+    const sendBtn = $('#sendBtn');
+    const chatForm = $('#chatForm');
+    
+    // Function to add message to chat
+    function addMessage(text, isUser = false) {
+        const messageClass = isUser ? 'user-message' : 'ai-message';
+        const messageHtml = `
+            <div class="chat-message ${messageClass}">
+                <p class="mb-0">${text}</p>
+            </div>
+        `;
+        
+        chatMessages.append(messageHtml);
+        chatMessages.scrollTop(chatMessages[0].scrollHeight);
+    }
+    
+    // Function to show typing indicator
+    function showTyping() {
+        const typingHtml = `
+            <div class="chat-message ai-message typing">
+                <p class="mb-0">
+                    <i class="fas fa-ellipsis-h"></i>
+                    <span class="ms-2">Mkulima AI is typing...</span>
+                </p>
+            </div>
+        `;
+        
+        chatMessages.append(typingHtml);
+        chatMessages.scrollTop(chatMessages[0].scrollHeight);
+        return $('.typing').last();
+    }
+    
+    // Function to remove typing indicator
+    function removeTyping(typingElement) {
+        typingElement.remove();
+    }
+    
+    // Send message
+    chatForm.on('submit', function(e) {
+        e.preventDefault();
+        
+        const message = messageInput.val().trim();
+        if (!message) return;
+        
+        // Add user message
+        addMessage(message, true);
+        
+        // Clear input
+        messageInput.val('');
+        
+        // Show typing indicator
+        const typingElement = showTyping();
+        
+        // Disable send button
+        sendBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+        
+        // Send to server
+        $.ajax({
+            url: "{{ url_for('chat_api') }}",
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ message: message }),
+            success: function(response) {
+                removeTyping(typingElement);
+                
+                if (response.success) {
+                    addMessage(response.response);
+                } else {
+                    addMessage(`Error: ${response.error}. Please try again or call +254 713 593 573 for help.`);
+                }
+                
+                sendBtn.prop('disabled', false).html('<i class="fas fa-paper-plane"></i>');
+            },
+            error: function() {
+                removeTyping(typingElement);
+                addMessage('Sorry, I\'m having trouble connecting. Please try again or call our support at +254 713 593 573.');
+                sendBtn.prop('disabled', false).html('<i class="fas fa-paper-plane"></i>');
+            }
+        });
+    });
+    
+    // Quick questions
+    $('.quick-question').on('click', function() {
+        const question = $(this).text();
+        messageInput.val(question);
+        chatForm.submit();
+    });
+    
+    // Auto-focus input
+    messageInput.focus();
+    
+    // Enter key to send
+    messageInput.on('keypress', function(e) {
+        if (e.which === 13 && !e.shiftKey) {
+            e.preventDefault();
+            chatForm.submit();
+        }
+    });
+    
+    // Emergency contact tracking
+    $('a[href*="tel:+254"]').on('click', function() {
+        console.log('AI Chat: Emergency contact initiated');
+    });
+});
+</script>
+{% endblock %}
