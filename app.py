@@ -99,6 +99,8 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
 
+# ========== ADD ALL MISSING ROUTES ==========
+
 @app.route('/')
 def index():
     if current_user.is_authenticated:
@@ -116,6 +118,40 @@ def index():
         elif current_user.user_type == 'admin':
             return redirect(url_for('admin_dashboard'))
     return render_template('index.html')
+
+@app.route('/about')
+def about():
+    return render_template('about.html')
+
+@app.route('/features')
+def features():
+    return render_template('features.html')
+
+@app.route('/contact')
+def contact():
+    return render_template('contact.html')
+
+@app.route('/faq')
+def faq():
+    return render_template('faq.html')
+
+@app.route('/privacy')
+def privacy():
+    return render_template('privacy.html')
+
+@app.route('/terms')
+def terms():
+    return render_template('terms.html')
+
+@app.route('/pricing')
+def pricing():
+    return render_template('pricing.html')
+
+@app.route('/help')
+def help():
+    return render_template('help.html')
+
+# ========== AUTHENTICATION ROUTES ==========
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -246,6 +282,8 @@ def logout():
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
 
+# ========== PROFILE ROUTES ==========
+
 @app.route('/profile')
 @login_required
 def profile():
@@ -299,6 +337,8 @@ def change_password():
     
     flash('Password changed successfully!', 'success')
     return redirect(url_for('profile'))
+
+# ========== COMMUNITY ROUTES ==========
 
 @app.route('/community')
 @login_required
@@ -417,6 +457,8 @@ def add_comment(post_id):
     
     flash('Comment added successfully!', 'success')
     return redirect(url_for('view_post', post_id=post_id))
+
+# ========== MARKETPLACE ROUTES ==========
 
 @app.route('/products')
 @login_required
@@ -687,6 +729,8 @@ def agrovet_order(order_id):
     
     return render_template('agrovet/order.html', order=order)
 
+# ========== MESSAGES ROUTES ==========
+
 @app.route('/messages')
 @login_required
 def messages():
@@ -780,6 +824,8 @@ def message_about_product(product_id):
     flash('Message sent to agrovet!', 'success')
     return redirect(url_for('chat_with_user', user_id=product.agrovet_id))
 
+# ========== REVIEWS ROUTES ==========
+
 @app.route('/reviews/user/<int:user_id>')
 @login_required
 def user_reviews(user_id):
@@ -816,6 +862,8 @@ def add_review(user_id):
         flash('Review submitted!', 'success')
     
     return redirect(request.referrer or url_for('profile'))
+
+# ========== RECOMMENDATIONS ROUTES ==========
 
 @app.route('/recommendations')
 @login_required
@@ -854,6 +902,8 @@ def upvote_recommendation(rec_id):
     db.session.commit()
     
     return jsonify({'success': True, 'upvotes': recommendation.upvotes})
+
+# ========== DASHBOARD ROUTES ==========
 
 @app.route('/admin/dashboard')
 @login_required
@@ -1347,7 +1397,8 @@ def add_communication(customer_id):
     flash('Communication log added successfully!', 'success')
     return redirect(url_for('view_customer', customer_id=customer_id))
 
-# Chat API
+# ========== AI CHAT ROUTES ==========
+
 @app.route('/api/chat', methods=['POST'])
 @login_required
 def chat():
@@ -1445,7 +1496,14 @@ def list_models():
     except Exception as e:
         return f"Error: {str(e)}"
 
-# Notification routes
+# ========== NOTIFICATION ROUTES ==========
+
+@app.route('/notifications')
+@login_required
+def notifications():
+    notifications = Notification.query.filter_by(user_id=current_user.id).order_by(Notification.created_at.desc()).all()
+    return render_template('notifications.html', notifications=notifications)
+
 @app.route('/notifications/mark-read/<int:notification_id>', methods=['POST'])
 @login_required
 def mark_notification_read(notification_id):
@@ -1459,12 +1517,78 @@ def mark_notification_read(notification_id):
     
     return jsonify({'success': True})
 
-# Template filter
+@app.route('/notifications/mark-all-read', methods=['POST'])
+@login_required
+def mark_all_notifications_read():
+    notifications = Notification.query.filter_by(user_id=current_user.id, is_read=False).all()
+    
+    for notification in notifications:
+        notification.is_read = True
+    
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+# ========== WEATHER ROUTE ==========
+
+@app.route('/weather')
+@login_required
+def weather():
+    location = request.args.get('location', current_user.location or 'Nairobi')
+    
+    try:
+        weather_url = f"http://api.openweathermap.org/data/2.5/weather?q={location}&appid={app.config['OPENWEATHER_API_KEY']}&units=metric"
+        response = requests.get(weather_url)
+        weather_data = response.json()
+        
+        forecast_url = f"http://api.openweathermap.org/data/2.5/forecast?q={location}&appid={app.config['OPENWEATHER_API_KEY']}&units=metric"
+        forecast_response = requests.get(forecast_url)
+        forecast_data = forecast_response.json()
+        
+        return render_template('weather.html', weather=weather_data, forecast=forecast_data)
+    except Exception as e:
+        flash(f'Error fetching weather data: {str(e)}', 'error')
+        return render_template('weather.html', weather=None, forecast=None)
+
+# ========== HEALTH CHECK ==========
+
+@app.route('/health')
+def health_check():
+    return jsonify({
+        'status': 'healthy',
+        'service': 'AgriConnect',
+        'contact': '+254713593573',
+        'timestamp': datetime.utcnow().isoformat()
+    }), 200
+
+# ========== TEMPLATE FILTERS ==========
+
 @app.template_filter('datetime')
 def format_datetime(value):
     if value is None:
         return ""
     return value.strftime('%Y-%m-%d %H:%M')
+
+@app.template_filter('date')
+def format_date(value):
+    if value is None:
+        return ""
+    return value.strftime('%Y-%m-%d')
+
+# ========== ERROR HANDLERS ==========
+
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template('errors/404.html'), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    db.session.rollback()
+    return render_template('errors/500.html'), 500
+
+@app.errorhandler(502)
+def bad_gateway_error(error):
+    return render_template('errors/502.html'), 502
 
 # Favicon
 @app.route('/favicon.ico')
