@@ -12,15 +12,15 @@ class Config:
         DATABASE_URL = os.environ.get('DATABASE_URL')
         if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
             DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+        SQLALCHEMY_DATABASE_URI = DATABASE_URL
     else:
-        DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///database.db')
+        SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///database.db')
     
-    SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # File uploads
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+    UPLOAD_FOLDER = 'uploads'
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx'}
     
     # Ensure upload folder exists
@@ -44,6 +44,3 @@ class Config:
     
     # Flask configuration
     PREFERRED_URL_SCHEME = 'https' if os.environ.get('RENDER') else 'http'
-    
-    # Plant disease detection
-    PLANT_DISEASE_MODEL = 'plant_disease_model_v1'
