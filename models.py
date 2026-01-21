@@ -3,6 +3,7 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 
+# Create db instance - don't import from app.py
 db = SQLAlchemy()
 
 class User(db.Model, UserMixin):
@@ -21,18 +22,6 @@ class User(db.Model, UserMixin):
     is_verified = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
-    
-    # Relationships
-    inventory_items = db.relationship('InventoryItem', backref='agrovet', lazy=True, foreign_keys='InventoryItem.agrovet_id')
-    farmer_orders = db.relationship('Order', backref='farmer', lazy=True, foreign_keys='Order.farmer_id')
-    agrovet_orders = db.relationship('Order', backref='agrovet', lazy=True, foreign_keys='Order.agrovet_id')
-    posts = db.relationship('CommunityPost', backref='author', lazy=True)
-    sent_messages = db.relationship('Message', backref='sender', lazy=True, foreign_keys='Message.sender_id')
-    received_messages = db.relationship('Message', backref='receiver', lazy=True, foreign_keys='Message.receiver_id')
-    notifications = db.relationship('Notification', backref='user', lazy=True)
-    reviews_received = db.relationship('UserReview', backref='user', lazy=True, foreign_keys='UserReview.user_id')
-    reviews_given = db.relationship('UserReview', backref='reviewer', lazy=True, foreign_keys='UserReview.reviewer_id')
-    disease_reports = db.relationship('DiseaseReport', backref='farmer', lazy=True)
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -60,10 +49,6 @@ class InventoryItem(db.Model):
     sku = db.Column(db.String(50), unique=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    cart_items = db.relationship('CartItem', backref='product', lazy=True)
-    order_items = db.relationship('OrderItem', backref='product', lazy=True)
 
 class Customer(db.Model):
     __tablename__ = 'customers'
@@ -79,10 +64,6 @@ class Customer(db.Model):
     last_purchase = db.Column(db.DateTime)
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Relationships
-    communications = db.relationship('Communication', backref='customer', lazy=True)
-    sales = db.relationship('Sale', backref='customer', lazy=True)
 
 class Sale(db.Model):
     __tablename__ = 'sales'
@@ -94,9 +75,6 @@ class Sale(db.Model):
     payment_method = db.Column(db.String(50))  # cash, mpesa, card
     receipt_number = db.Column(db.String(50), unique=True)
     sale_date = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Relationships
-    sale_items = db.relationship('SaleItem', backref='sale', lazy=True)
 
 class SaleItem(db.Model):
     __tablename__ = 'sale_items'
@@ -134,9 +112,6 @@ class DiseaseReport(db.Model):
     longitude = db.Column(db.Float)
     status = db.Column(db.String(50), default='pending')  # pending, reviewed, treated
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def __repr__(self):
-        return f'<DiseaseReport {self.id} by Farmer {self.farmer_id}>'
 
 class Notification(db.Model):
     __tablename__ = 'notifications'
@@ -149,9 +124,6 @@ class Notification(db.Model):
     link = db.Column(db.String(500))
     is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def __repr__(self):
-        return f'<Notification {self.id} for User {self.user_id}>'
 
 class WeatherData(db.Model):
     __tablename__ = 'weather_data'
@@ -164,9 +136,6 @@ class WeatherData(db.Model):
     wind_speed = db.Column(db.Float)
     weather_description = db.Column(db.String(200))
     recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def __repr__(self):
-        return f'<WeatherData {self.id} for {self.location}>'
 
 class CommunityPost(db.Model):
     __tablename__ = 'community_posts'
@@ -184,13 +153,6 @@ class CommunityPost(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    comments = db.relationship('PostComment', backref='post', lazy=True, cascade='all, delete-orphan')
-    follows = db.relationship('PostFollow', backref='post', lazy=True, cascade='all, delete-orphan')
-    
-    def __repr__(self):
-        return f'<CommunityPost {self.id} by User {self.author_id}>'
 
 class PostComment(db.Model):
     __tablename__ = 'post_comments'
@@ -202,11 +164,6 @@ class PostComment(db.Model):
     is_answer = db.Column(db.Boolean, default=False)
     likes = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    author = db.relationship('User', backref='comments')
-    
-    def __repr__(self):
-        return f'<PostComment {self.id} on Post {self.post_id}>'
 
 class PostFollow(db.Model):
     __tablename__ = 'post_follows'
@@ -217,9 +174,6 @@ class PostFollow(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     __table_args__ = (db.UniqueConstraint('post_id', 'user_id', name='unique_post_follow'),)
-    
-    def __repr__(self):
-        return f'<PostFollow User {self.user_id} following Post {self.post_id}>'
 
 class UserReview(db.Model):
     __tablename__ = 'user_reviews'
@@ -234,9 +188,6 @@ class UserReview(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     __table_args__ = (db.UniqueConstraint('user_id', 'reviewer_id', name='unique_user_review'),)
-    
-    def __repr__(self):
-        return f'<UserReview {self.id} for User {self.user_id}>'
 
 class AppRecommendation(db.Model):
     __tablename__ = 'app_recommendations'
@@ -249,11 +200,6 @@ class AppRecommendation(db.Model):
     upvotes = db.Column(db.Integer, default=0)
     status = db.Column(db.String(50), default='pending')  # pending, reviewed, implemented
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    author = db.relationship('User', backref='recommendations')
-    
-    def __repr__(self):
-        return f'<AppRecommendation {self.id} by User {self.author_id}>'
 
 class CartItem(db.Model):
     __tablename__ = 'cart_items'
@@ -263,11 +209,6 @@ class CartItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('inventory_items.id'), nullable=False)
     quantity = db.Column(db.Integer, default=1)
     added_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    user = db.relationship('User', backref='cart_items')
-    
-    def __repr__(self):
-        return f'<CartItem {self.id} for User {self.user_id}>'
 
 class Order(db.Model):
     __tablename__ = 'orders'
@@ -284,12 +225,6 @@ class Order(db.Model):
     status = db.Column(db.String(50), default='pending')  # pending, confirmed, processing, shipped, delivered, cancelled
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    order_items = db.relationship('OrderItem', backref='order', lazy=True, cascade='all, delete-orphan')
-    
-    def __repr__(self):
-        return f'<Order {self.order_number}>'
 
 class OrderItem(db.Model):
     __tablename__ = 'order_items'
@@ -301,9 +236,6 @@ class OrderItem(db.Model):
     quantity = db.Column(db.Integer, nullable=False)
     unit_price = db.Column(db.Float, nullable=False)
     subtotal = db.Column(db.Float, nullable=False)
-    
-    def __repr__(self):
-        return f'<OrderItem {self.id} for Order {self.order_id}>'
 
 class PasswordResetToken(db.Model):
     __tablename__ = 'password_reset_tokens'
@@ -314,11 +246,6 @@ class PasswordResetToken(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
     used = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    user = db.relationship('User', backref='reset_tokens')
-    
-    def __repr__(self):
-        return f'<PasswordResetToken {self.token} for User {self.user_id}>'
 
 class Message(db.Model):
     __tablename__ = 'messages'
@@ -332,8 +259,3 @@ class Message(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('inventory_items.id'))
     is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    product = db.relationship('InventoryItem', backref='inquiry_messages')
-    
-    def __repr__(self):
-        return f'<Message {self.id} from {self.sender_id} to {self.receiver_id}>'
