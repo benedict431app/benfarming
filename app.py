@@ -1,20 +1,22 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_file, send_from_directory
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from werkzeug.utils import secure_filename
-from datetime import datetime, timedelta
-import requests
 import secrets
 import uuid
 import json
-from PIL import Image
-import io
 import base64
+import io
 import smtplib
+from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# Create Flask app FIRST
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_file, send_from_directory
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from werkzeug.utils import secure_filename
+from PIL import Image
+import requests
+
+# Create Flask app
 app = Flask(__name__)
 
 # Import config and apply it
@@ -27,19 +29,12 @@ if os.environ.get('RENDER'):
     if database_url and database_url.startswith('postgres://'):
         app.config['SQLALCHEMY_DATABASE_URI'] = database_url.replace('postgres://', 'postgresql://', 1)
 
-# Initialize extensions BEFORE importing models
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
-
-db = SQLAlchemy()
-login_manager = LoginManager()
-
-# Initialize extensions with app
-db.init_app(app)
-login_manager.init_app(app)
+# Initialize extensions
+db = SQLAlchemy(app)
+login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# NOW import models after db is initialized
+# Import models AFTER db is initialized
 from models import User, InventoryItem, Customer, Sale, SaleItem, Communication, DiseaseReport, Notification, WeatherData, CommunityPost, PostComment, PostFollow, UserReview, AppRecommendation, CartItem, Order, OrderItem, PasswordResetToken, Message
 
 # Configure Cohere
@@ -90,9 +85,86 @@ def send_email(to_email, subject, body):
         print(f"Email error: {e}")
         return False
 
-# Create database tables
+def detect_plant_disease(image_path, description=""):
+    """Detect plant disease using AI analysis"""
+    try:
+        if cohere_api_key and cohere_api_key != 'cohere-api-key-placeholder':
+            headers = {
+                'Authorization': f'Bearer {cohere_api_key}',
+                'Content-Type': 'application/json',
+            }
+            
+            with open(image_path, 'rb') as img_file:
+                img_base64 = base64.b64encode(img_file.read()).decode('utf-8')
+            
+            chat_payload = {
+                'model': 'c4ai-aya-expanse-8b',
+                'message': f"""
+                Analyze this plant image for diseases and health issues.
+                
+                User description: {description}
+                
+                As an agricultural expert, please:
+                1. Identify the plant species if possible
+                2. Detect any visible diseases or pests
+                3. Recommend specific treatments
+                4. Provide agroecological solutions
+                5. Suggest prevention measures
+                
+                Format your response clearly with sections.
+                If the image doesn't appear to be a plant, please state that clearly.
+                """,
+                'temperature': 0.7,
+                'max_tokens': 1000
+            }
+            
+            response = requests.post('https://api.cohere.ai/v1/chat', json=chat_payload, headers=headers)
+            result = response.json()
+            
+            if response.status_code == 200 and 'text' in result:
+                return result['text']
+            else:
+                return "Unable to analyze plant health at the moment. Please try again later or consult with an agricultural officer."
+        
+        return """Plant Health Analysis:
+        
+        1. Plant Identification: Based on the image, this appears to be a common crop plant. 
+        
+        2. Disease Detection: The plant shows signs of potential nutrient deficiency or early-stage fungal infection.
+        
+        3. Recommended Treatment:
+           - Apply organic fungicide (neem oil or copper-based)
+           - Ensure proper soil drainage
+           - Maintain appropriate watering schedule
+           - Remove affected leaves if necessary
+        
+        4. Agroecological Solutions:
+           - Practice crop rotation
+           - Use companion planting (marigolds, basil)
+           - Apply compost tea as natural fertilizer
+           - Introduce beneficial insects
+        
+        5. Prevention:
+           - Monitor plants regularly
+           - Maintain proper spacing for air circulation
+           - Water at soil level, not on leaves
+           - Use disease-resistant varieties
+        
+        Note: For accurate diagnosis, consult with your local extension officer."""
+    
+    except Exception as e:
+        print(f"Error in plant detection: {e}")
+        return "Error analyzing plant image. Please try again."
+
+def get_unread_notification_count():
+    if not current_user.is_authenticated:
+        return 0
+    return Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
+
+# ========== DATABASE INITIALIZATION ==========
 with app.app_context():
     db.create_all()
+    
     # Create admin user if not exists
     if not User.query.filter_by(email='admin@adiseware.com').first():
         admin = User(
@@ -147,13 +219,6 @@ with app.app_context():
         db.session.add(agrovet)
     
     db.session.commit()
-
-# ========== HELPER FUNCTIONS ==========
-
-def get_unread_notification_count():
-    if not current_user.is_authenticated:
-        return 0
-    return Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
 
 # ========== BASIC PAGES ==========
 
@@ -283,7 +348,6 @@ def login():
             
             flash('Login successful!', 'success')
             
-            # Redirect based on user type
             if user.user_type == 'farmer':
                 return redirect(url_for('farmer_dashboard'))
             elif user.user_type == 'agrovet':
@@ -318,7 +382,7 @@ def forgot_password():
             db.session.commit()
             
             reset_link = url_for('reset_password', token=token, _external=True)
-            # send_email(user.email, "Password Reset", f"Click to reset: {reset_link}")
+            send_email(user.email, "Password Reset", f"Click to reset: {reset_link}")
             
             flash('Password reset instructions sent to your email', 'success')
         else:
@@ -575,80 +639,6 @@ def make_admin(user_id):
 
 # ========== PLANT DISEASE DETECTION ==========
 
-def detect_plant_disease(image_path, description=""):
-    """Detect plant disease using AI analysis"""
-    try:
-        # If Cohere API is available, use it
-        if cohere_api_key and cohere_api_key != 'cohere-api-key-placeholder':
-            headers = {
-                'Authorization': f'Bearer {cohere_api_key}',
-                'Content-Type': 'application/json',
-            }
-            
-            # Read image and convert to base64
-            with open(image_path, 'rb') as img_file:
-                img_base64 = base64.b64encode(img_file.read()).decode('utf-8')
-            
-            chat_payload = {
-                'model': 'c4ai-aya-expanse-8b',
-                'message': f"""
-                Analyze this plant image for diseases and health issues.
-                
-                User description: {description}
-                
-                As an agricultural expert, please:
-                1. Identify the plant species if possible
-                2. Detect any visible diseases or pests
-                3. Recommend specific treatments
-                4. Provide agroecological solutions
-                5. Suggest prevention measures
-                
-                Format your response clearly with sections.
-                If the image doesn't appear to be a plant, please state that clearly.
-                """,
-                'temperature': 0.7,
-                'max_tokens': 1000
-            }
-            
-            response = requests.post('https://api.cohere.ai/v1/chat', json=chat_payload, headers=headers)
-            result = response.json()
-            
-            if response.status_code == 200 and 'text' in result:
-                return result['text']
-            else:
-                return "Unable to analyze plant health at the moment. Please try again later or consult with an agricultural officer."
-        
-        # Fallback to generic analysis if no API
-        return """Plant Health Analysis:
-        
-        1. Plant Identification: Based on the image, this appears to be a common crop plant. 
-        
-        2. Disease Detection: The plant shows signs of potential nutrient deficiency or early-stage fungal infection.
-        
-        3. Recommended Treatment:
-           - Apply organic fungicide (neem oil or copper-based)
-           - Ensure proper soil drainage
-           - Maintain appropriate watering schedule
-           - Remove affected leaves if necessary
-        
-        4. Agroecological Solutions:
-           - Practice crop rotation
-           - Use companion planting (marigolds, basil)
-           - Apply compost tea as natural fertilizer
-           - Introduce beneficial insects
-        
-        5. Prevention:
-           - Monitor plants regularly
-           - Maintain proper spacing for air circulation
-           - Water at soil level, not on leaves
-           - Use disease-resistant varieties
-        
-        Note: For accurate diagnosis, consult with your local extension officer."""
-    
-    except Exception as e:
-        print(f"Error in plant detection: {e}")
-        return "Error analyzing plant image. Please try again."
-
 @app.route('/farmer/detect-disease', methods=['GET', 'POST'])
 @login_required
 def detect_disease():
@@ -850,6 +840,99 @@ def community():
     unread_count = get_unread_notification_count()
     return render_template('community/posts.html', posts=posts, unread_count=unread_count)
 
+@app.route('/community/create', methods=['GET', 'POST'])
+@login_required
+def create_post():
+    if request.method == 'POST':
+        title = request.form.get('title')
+        content = request.form.get('content')
+        category = request.form.get('category', 'general')
+        
+        if not title or not content:
+            flash('Title and content are required', 'error')
+            return redirect(url_for('create_post'))
+        
+        post = CommunityPost(
+            title=title,
+            content=content,
+            category=category,
+            author_id=current_user.id
+        )
+        
+        if 'post_image' in request.files:
+            file = request.files['post_image']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(f"post_{current_user.id}_{datetime.utcnow().timestamp()}_{file.filename}")
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'community_posts', filename)
+                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                file.save(filepath)
+                post.image = filename
+        
+        db.session.add(post)
+        db.session.commit()
+        
+        flash('Post created successfully!', 'success')
+        return redirect(url_for('community'))
+    
+    unread_count = get_unread_notification_count()
+    return render_template('community/create_post.html', unread_count=unread_count)
+
+@app.route('/community/post/<int:post_id>')
+@login_required
+def view_post(post_id):
+    post = CommunityPost.query.get_or_404(post_id)
+    comments = PostComment.query.filter_by(post_id=post_id).order_by(PostComment.created_at.asc()).all()
+    is_following = PostFollow.query.filter_by(post_id=post_id, user_id=current_user.id).first() is not None
+    
+    unread_count = get_unread_notification_count()
+    return render_template('community/view_post.html', 
+                         post=post, 
+                         comments=comments,
+                         is_following=is_following,
+                         unread_count=unread_count)
+
+@app.route('/community/post/<int:post_id>/comment', methods=['POST'])
+@login_required
+def add_comment(post_id):
+    content = request.form.get('content')
+    
+    if not content:
+        flash('Comment content is required', 'error')
+        return redirect(url_for('view_post', post_id=post_id))
+    
+    comment = PostComment(
+        post_id=post_id,
+        user_id=current_user.id,
+        content=content
+    )
+    
+    db.session.add(comment)
+    db.session.commit()
+    
+    flash('Comment added successfully!', 'success')
+    return redirect(url_for('view_post', post_id=post_id))
+
+@app.route('/community/post/<int:post_id>/follow', methods=['POST'])
+@login_required
+def follow_post(post_id):
+    existing_follow = PostFollow.query.filter_by(post_id=post_id, user_id=current_user.id).first()
+    
+    if existing_follow:
+        db.session.delete(existing_follow)
+        message = 'Post unfollowed'
+    else:
+        follow = PostFollow(post_id=post_id, user_id=current_user.id)
+        db.session.add(follow)
+        message = 'Post followed'
+    
+    db.session.commit()
+    
+    if request.is_json:
+        return jsonify({'success': True, 'message': message})
+    
+    flash(message, 'success')
+    return redirect(url_for('view_post', post_id=post_id))
+
 # ========== MARKETPLACE ROUTES ==========
 
 @app.route('/products')
@@ -873,6 +956,450 @@ def browse_products():
     unread_count = get_unread_notification_count()
     return render_template('products/browse.html', product_groups=product_groups, unread_count=unread_count)
 
+@app.route('/products/<int:product_id>')
+@login_required
+def view_product(product_id):
+    product = InventoryItem.query.get_or_404(product_id)
+    
+    if product.agrovet.user_type != 'agrovet' or not product.agrovet.is_active:
+        flash('Product not available', 'error')
+        return redirect(url_for('browse_products'))
+    
+    unread_count = get_unread_notification_count()
+    return render_template('products/view_product.html', product=product, unread_count=unread_count)
+
+@app.route('/cart')
+@login_required
+def view_cart():
+    cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
+    total = sum(item.quantity * item.product.price for item in cart_items)
+    
+    unread_count = get_unread_notification_count()
+    return render_template('cart/view.html', cart_items=cart_items, total=total, unread_count=unread_count)
+
+@app.route('/cart/add/<int:product_id>', methods=['POST'])
+@login_required
+def add_to_cart(product_id):
+    product = InventoryItem.query.get_or_404(product_id)
+    quantity = int(request.form.get('quantity', 1))
+    
+    if product.quantity < quantity:
+        flash(f'Only {product.quantity} items available in stock', 'error')
+        return redirect(url_for('view_product', product_id=product_id))
+    
+    cart_item = CartItem.query.filter_by(user_id=current_user.id, product_id=product_id).first()
+    
+    if cart_item:
+        cart_item.quantity += quantity
+    else:
+        cart_item = CartItem(
+            user_id=current_user.id,
+            product_id=product_id,
+            quantity=quantity
+        )
+        db.session.add(cart_item)
+    
+    db.session.commit()
+    
+    flash(f'{product.product_name} added to cart!', 'success')
+    return redirect(url_for('view_cart'))
+
+@app.route('/cart/update/<int:item_id>', methods=['POST'])
+@login_required
+def update_cart_item(item_id):
+    cart_item = CartItem.query.get_or_404(item_id)
+    
+    if cart_item.user_id != current_user.id:
+        flash('Access denied', 'error')
+        return redirect(url_for('view_cart'))
+    
+    quantity = int(request.form.get('quantity', 1))
+    
+    if quantity <= 0:
+        db.session.delete(cart_item)
+    else:
+        if cart_item.product.quantity < quantity:
+            flash(f'Only {cart_item.product.quantity} items available in stock', 'error')
+            return redirect(url_for('view_cart'))
+        
+        cart_item.quantity = quantity
+    
+    db.session.commit()
+    flash('Cart updated!', 'success')
+    return redirect(url_for('view_cart'))
+
+@app.route('/cart/remove/<int:item_id>', methods=['POST'])
+@login_required
+def remove_from_cart(item_id):
+    cart_item = CartItem.query.get_or_404(item_id)
+    
+    if cart_item.user_id != current_user.id:
+        flash('Access denied', 'error')
+        return redirect(url_for('view_cart'))
+    
+    db.session.delete(cart_item)
+    db.session.commit()
+    
+    flash('Item removed from cart', 'success')
+    return redirect(url_for('view_cart'))
+
+@app.route('/checkout', methods=['GET', 'POST'])
+@login_required
+def checkout():
+    cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
+    
+    if not cart_items:
+        flash('Your cart is empty', 'error')
+        return redirect(url_for('view_cart'))
+    
+    # Check stock availability
+    for item in cart_items:
+        if item.product.quantity < item.quantity:
+            flash(f'Insufficient stock for {item.product.product_name}. Only {item.product.quantity} available.', 'error')
+            return redirect(url_for('view_cart'))
+    
+    if request.method == 'POST':
+        shipping_address = request.form.get('shipping_address')
+        payment_method = request.form.get('payment_method', 'mpesa')
+        notes = request.form.get('notes', '')
+        
+        # Create order
+        order = Order(
+            user_id=current_user.id,
+            agrovet_id=cart_items[0].product.agrovet_id,
+            shipping_address=shipping_address,
+            payment_method=payment_method,
+            notes=notes,
+            total_amount=sum(item.quantity * item.product.price for item in cart_items)
+        )
+        
+        db.session.add(order)
+        
+        # Create order items and update inventory
+        for item in cart_items:
+            order_item = OrderItem(
+                order=order,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                price=item.product.price
+            )
+            db.session.add(order_item)
+            
+            # Update inventory
+            item.product.quantity -= item.quantity
+        
+        # Clear cart
+        CartItem.query.filter_by(user_id=current_user.id).delete()
+        
+        db.session.commit()
+        
+        flash('Order placed successfully!', 'success')
+        return redirect(url_for('order_confirmation', order_id=order.id))
+    
+    total = sum(item.quantity * item.product.price for item in cart_items)
+    unread_count = get_unread_notification_count()
+    
+    return render_template('cart/checkout.html', cart_items=cart_items, total=total, unread_count=unread_count)
+
+@app.route('/order/confirmation/<int:order_id>')
+@login_required
+def order_confirmation(order_id):
+    order = Order.query.get_or_404(order_id)
+    
+    if order.user_id != current_user.id:
+        flash('Access denied', 'error')
+        return redirect(url_for('index'))
+    
+    unread_count = get_unread_notification_count()
+    return render_template('cart/confirmation.html', order=order, unread_count=unread_count)
+
+@app.route('/orders')
+@login_required
+def my_orders():
+    if current_user.user_type == 'agrovet':
+        orders = Order.query.filter_by(agrovet_id=current_user.id).order_by(Order.created_at.desc()).all()
+    else:
+        orders = Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).all()
+    
+    unread_count = get_unread_notification_count()
+    return render_template('orders/list.html', orders=orders, unread_count=unread_count)
+
+@app.route('/orders/<int:order_id>')
+@login_required
+def view_order(order_id):
+    order = Order.query.get_or_404(order_id)
+    
+    if order.user_id != current_user.id and order.agrovet_id != current_user.id:
+        flash('Access denied', 'error')
+        return redirect(url_for('index'))
+    
+    unread_count = get_unread_notification_count()
+    return render_template('orders/view.html', order=order, unread_count=unread_count)
+
+@app.route('/orders/<int:order_id>/update-status', methods=['POST'])
+@login_required
+def update_order_status(order_id):
+    order = Order.query.get_or_404(order_id)
+    
+    if order.agrovet_id != current_user.id:
+        flash('Access denied', 'error')
+        return redirect(url_for('index'))
+    
+    new_status = request.form.get('status')
+    
+    if new_status not in ['pending', 'processing', 'shipped', 'delivered', 'cancelled']:
+        flash('Invalid status', 'error')
+        return redirect(url_for('view_order', order_id=order_id))
+    
+    order.status = new_status
+    db.session.commit()
+    
+    flash(f'Order status updated to {new_status}', 'success')
+    return redirect(url_for('view_order', order_id=order_id))
+
+# ========== AGROVET INVENTORY ROUTES ==========
+
+@app.route('/agrovet/inventory')
+@login_required
+def agrovet_inventory():
+    if current_user.user_type != 'agrovet':
+        flash('Access denied', 'error')
+        return redirect(url_for('index'))
+    
+    inventory = InventoryItem.query.filter_by(agrovet_id=current_user.id).order_by(InventoryItem.product_name).all()
+    low_stock = InventoryItem.query.filter_by(agrovet_id=current_user.id).filter(
+        InventoryItem.quantity <= InventoryItem.reorder_level
+    ).all()
+    
+    unread_count = get_unread_notification_count()
+    return render_template('agrovet/inventory.html', inventory=inventory, low_stock=low_stock, unread_count=unread_count)
+
+@app.route('/agrovet/inventory/add', methods=['GET', 'POST'])
+@login_required
+def add_inventory_item():
+    if current_user.user_type != 'agrovet':
+        flash('Access denied', 'error')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        product_name = request.form.get('product_name')
+        category = request.form.get('category')
+        description = request.form.get('description')
+        price = float(request.form.get('price', 0))
+        quantity = int(request.form.get('quantity', 0))
+        reorder_level = int(request.form.get('reorder_level', 10))
+        unit = request.form.get('unit', 'pieces')
+        
+        item = InventoryItem(
+            agrovet_id=current_user.id,
+            product_name=product_name,
+            category=category,
+            description=description,
+            price=price,
+            quantity=quantity,
+            reorder_level=reorder_level,
+            unit=unit
+        )
+        
+        if 'product_image' in request.files:
+            file = request.files['product_image']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(f"product_{current_user.id}_{datetime.utcnow().timestamp()}_{file.filename}")
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'products', filename)
+                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                file.save(filepath)
+                item.image = filename
+        
+        db.session.add(item)
+        db.session.commit()
+        
+        flash('Product added to inventory!', 'success')
+        return redirect(url_for('agrovet_inventory'))
+    
+    unread_count = get_unread_notification_count()
+    return render_template('agrovet/add_inventory.html', unread_count=unread_count)
+
+@app.route('/agrovet/inventory/<int:item_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_inventory_item(item_id):
+    if current_user.user_type != 'agrovet':
+        flash('Access denied', 'error')
+        return redirect(url_for('index'))
+    
+    item = InventoryItem.query.get_or_404(item_id)
+    
+    if item.agrovet_id != current_user.id:
+        flash('Access denied', 'error')
+        return redirect(url_for('agrovet_inventory'))
+    
+    if request.method == 'POST':
+        item.product_name = request.form.get('product_name')
+        item.category = request.form.get('category')
+        item.description = request.form.get('description')
+        item.price = float(request.form.get('price', 0))
+        item.quantity = int(request.form.get('quantity', 0))
+        item.reorder_level = int(request.form.get('reorder_level', 10))
+        item.unit = request.form.get('unit', 'pieces')
+        
+        if 'product_image' in request.files:
+            file = request.files['product_image']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(f"product_{current_user.id}_{datetime.utcnow().timestamp()}_{file.filename}")
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'products', filename)
+                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                file.save(filepath)
+                item.image = filename
+        
+        db.session.commit()
+        flash('Product updated!', 'success')
+        return redirect(url_for('agrovet_inventory'))
+    
+    unread_count = get_unread_notification_count()
+    return render_template('agrovet/edit_inventory.html', item=item, unread_count=unread_count)
+
+@app.route('/agrovet/inventory/<int:item_id>/delete', methods=['POST'])
+@login_required
+def delete_inventory_item(item_id):
+    if current_user.user_type != 'agrovet':
+        return jsonify({'error': 'Access denied'}), 403
+    
+    item = InventoryItem.query.get_or_404(item_id)
+    
+    if item.agrovet_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    db.session.delete(item)
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+# ========== CUSTOMER MANAGEMENT ==========
+
+@app.route('/agrovet/customers')
+@login_required
+def agrovet_customers():
+    if current_user.user_type != 'agrovet':
+        flash('Access denied', 'error')
+        return redirect(url_for('index'))
+    
+    customers = Customer.query.filter_by(agrovet_id=current_user.id).order_by(Customer.created_at.desc()).all()
+    
+    unread_count = get_unread_notification_count()
+    return render_template('agrovet/customers.html', customers=customers, unread_count=unread_count)
+
+@app.route('/agrovet/customers/add', methods=['POST'])
+@login_required
+def add_customer():
+    if current_user.user_type != 'agrovet':
+        return jsonify({'error': 'Access denied'}), 403
+    
+    name = request.form.get('name')
+    phone = request.form.get('phone')
+    email = request.form.get('email')
+    location = request.form.get('location')
+    
+    customer = Customer(
+        agrovet_id=current_user.id,
+        name=name,
+        phone=phone,
+        email=email,
+        location=location
+    )
+    
+    db.session.add(customer)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'customer_id': customer.id})
+
+# ========== SALES MANAGEMENT ==========
+
+@app.route('/agrovet/sales')
+@login_required
+def agrovet_sales():
+    if current_user.user_type != 'agrovet':
+        flash('Access denied', 'error')
+        return redirect(url_for('index'))
+    
+    sales = Sale.query.filter_by(agrovet_id=current_user.id).order_by(Sale.sale_date.desc()).all()
+    
+    unread_count = get_unread_notification_count()
+    return render_template('agrovet/sales.html', sales=sales, unread_count=unread_count)
+
+@app.route('/agrovet/sales/new', methods=['GET', 'POST'])
+@login_required
+def new_sale():
+    if current_user.user_type != 'agrovet':
+        flash('Access denied', 'error')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        customer_id = request.form.get('customer_id')
+        items = json.loads(request.form.get('items', '[]'))
+        
+        if not items:
+            flash('No items selected for sale', 'error')
+            return redirect(url_for('new_sale'))
+        
+        # Check stock and calculate total
+        total_amount = 0
+        sale_items = []
+        
+        for item_data in items:
+            product_id = item_data.get('product_id')
+            quantity = int(item_data.get('quantity', 1))
+            
+            product = InventoryItem.query.get(product_id)
+            
+            if not product or product.agrovet_id != current_user.id:
+                flash(f'Invalid product: {product_id}', 'error')
+                return redirect(url_for('new_sale'))
+            
+            if product.quantity < quantity:
+                flash(f'Insufficient stock for {product.product_name}', 'error')
+                return redirect(url_for('new_sale'))
+            
+            total_amount += product.price * quantity
+            
+            # Update inventory
+            product.quantity -= quantity
+            
+            sale_items.append({
+                'product': product,
+                'quantity': quantity,
+                'price': product.price
+            })
+        
+        # Create sale
+        sale = Sale(
+            agrovet_id=current_user.id,
+            customer_id=customer_id if customer_id else None,
+            total_amount=total_amount
+        )
+        
+        db.session.add(sale)
+        db.session.flush()  # Get sale ID
+        
+        # Create sale items
+        for item_data in sale_items:
+            sale_item = SaleItem(
+                sale_id=sale.id,
+                product_id=item_data['product'].id,
+                quantity=item_data['quantity'],
+                price=item_data['price']
+            )
+            db.session.add(sale_item)
+        
+        db.session.commit()
+        
+        flash('Sale recorded successfully!', 'success')
+        return redirect(url_for('agrovet_sales'))
+    
+    products = InventoryItem.query.filter_by(agrovet_id=current_user.id).filter(InventoryItem.quantity > 0).all()
+    customers = Customer.query.filter_by(agrovet_id=current_user.id).all()
+    
+    unread_count = get_unread_notification_count()
+    return render_template('agrovet/new_sale.html', products=products, customers=customers, unread_count=unread_count)
+
 # ========== NOTIFICATION ROUTES ==========
 
 @app.route('/notifications')
@@ -881,6 +1408,137 @@ def notifications():
     notifications_list = Notification.query.filter_by(user_id=current_user.id).order_by(Notification.created_at.desc()).all()
     unread_count = get_unread_notification_count()
     return render_template('notifications.html', notifications=notifications_list, unread_count=unread_count)
+
+@app.route('/notifications/read/<int:notification_id>', methods=['POST'])
+@login_required
+def mark_notification_read(notification_id):
+    notification = Notification.query.get_or_404(notification_id)
+    
+    if notification.user_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    notification.is_read = True
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+@app.route('/notifications/read-all', methods=['POST'])
+@login_required
+def mark_all_notifications_read():
+    Notification.query.filter_by(user_id=current_user.id, is_read=False).update({'is_read': True})
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+# ========== MESSAGING SYSTEM ==========
+
+@app.route('/messages')
+@login_required
+def messages():
+    sent_messages = Message.query.filter_by(sender_id=current_user.id).order_by(Message.created_at.desc()).all()
+    received_messages = Message.query.filter_by(receiver_id=current_user.id).order_by(Message.created_at.desc()).all()
+    
+    unread_count = get_unread_notification_count()
+    return render_template('messages/list.html', 
+                         sent_messages=sent_messages, 
+                         received_messages=received_messages,
+                         unread_count=unread_count)
+
+@app.route('/messages/send', methods=['GET', 'POST'])
+@login_required
+def send_message():
+    if request.method == 'POST':
+        receiver_id = request.form.get('receiver_id')
+        subject = request.form.get('subject')
+        content = request.form.get('content')
+        
+        if not receiver_id or not subject or not content:
+            flash('All fields are required', 'error')
+            return redirect(url_for('send_message'))
+        
+        receiver = User.query.get(receiver_id)
+        
+        if not receiver:
+            flash('Receiver not found', 'error')
+            return redirect(url_for('send_message'))
+        
+        message = Message(
+            sender_id=current_user.id,
+            receiver_id=receiver_id,
+            subject=subject,
+            content=content
+        )
+        
+        db.session.add(message)
+        db.session.commit()
+        
+        flash('Message sent successfully!', 'success')
+        return redirect(url_for('messages'))
+    
+    users = User.query.filter(User.id != current_user.id, User.is_active == True).all()
+    unread_count = get_unread_notification_count()
+    
+    return render_template('messages/send.html', users=users, unread_count=unread_count)
+
+@app.route('/messages/<int:message_id>')
+@login_required
+def view_message(message_id):
+    message = Message.query.get_or_404(message_id)
+    
+    if message.sender_id != current_user.id and message.receiver_id != current_user.id:
+        flash('Access denied', 'error')
+        return redirect(url_for('messages'))
+    
+    # Mark as read if receiver
+    if message.receiver_id == current_user.id and not message.is_read:
+        message.is_read = True
+        db.session.commit()
+    
+    unread_count = get_unread_notification_count()
+    return render_template('messages/view.html', message=message, unread_count=unread_count)
+
+# ========== REVIEWS AND RATINGS ==========
+
+@app.route('/reviews')
+@login_required
+def reviews():
+    my_reviews = UserReview.query.filter_by(user_id=current_user.id).all()
+    reviews_about_me = UserReview.query.filter_by(reviewed_user_id=current_user.id).all()
+    
+    unread_count = get_unread_notification_count()
+    return render_template('reviews/list.html', 
+                         my_reviews=my_reviews, 
+                         reviews_about_me=reviews_about_me,
+                         unread_count=unread_count)
+
+@app.route('/reviews/create/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+def create_review(user_id):
+    reviewed_user = User.query.get_or_404(user_id)
+    
+    if reviewed_user.id == current_user.id:
+        flash('You cannot review yourself', 'error')
+        return redirect(url_for('reviews'))
+    
+    if request.method == 'POST':
+        rating = int(request.form.get('rating', 5))
+        comment = request.form.get('comment', '')
+        
+        review = UserReview(
+            user_id=current_user.id,
+            reviewed_user_id=reviewed_user.id,
+            rating=rating,
+            comment=comment
+        )
+        
+        db.session.add(review)
+        db.session.commit()
+        
+        flash('Review submitted successfully!', 'success')
+        return redirect(url_for('reviews'))
+    
+    unread_count = get_unread_notification_count()
+    return render_template('reviews/create.html', reviewed_user=reviewed_user, unread_count=unread_count)
 
 # ========== HEALTH CHECK ==========
 
